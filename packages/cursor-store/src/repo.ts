@@ -26,6 +26,8 @@ export interface ComposerMeta {
   trackedRepoPath: string | null;
   /** Number of messages; 0 means an empty "new chat" stub. */
   messageCount: number;
+  /** Epoch ms of last activity (lastUpdatedAt, else createdAt); null if unknown. */
+  updatedAt: number | null;
 }
 
 function lastInteraction(repo: { branches?: Array<{ lastInteractionAt?: number }> }): number {
@@ -47,7 +49,11 @@ export function composerMeta(composerValue: Buffer | string | null): ComposerMet
     const best = [...tracked].sort((a, b) => lastInteraction(b) - lastInteraction(a))[0];
     trackedRepoPath = best?.repoPath ?? null;
   }
-  return { fsPath, trackedRepoPath, messageCount };
+  const updated = obj?.["lastUpdatedAt"];
+  const created = obj?.["createdAt"];
+  const updatedAt =
+    typeof updated === "number" ? updated : typeof created === "number" ? created : null;
+  return { fsPath, trackedRepoPath, messageCount, updatedAt };
 }
 
 /** The best folder for a conversation: its recorded workspace, else its tracked git repo. */
@@ -123,19 +129,28 @@ export function repoIdForPath(folderPath: string): string {
   return remote ?? `path:${folderPath}`;
 }
 
-/** Build composerId -> repo id by scanning every composerData row in the DB. */
-export function buildComposerRepoMap(db: Database.Database): Map<string, string> {
-  const map = new Map<string, string>();
+/**
+ * Scan every composerData row once and build two composerId-keyed maps: repo id (for per-repo
+ * sync) and last-activity epoch ms (for the rolling time window).
+ */
+export function buildComposerInfo(db: Database.Database): {
+  repo: Map<string, string>;
+  time: Map<string, number>;
+} {
+  const repo = new Map<string, string>();
+  const time = new Map<string, number>();
   const stmt = db.prepare(
     "SELECT key, value FROM cursorDiskKV WHERE key >= 'composerData:' AND key < 'composerData:~' AND value IS NOT NULL",
   );
   for (const r of stmt.iterate() as IterableIterator<{ key: string; value: Buffer | string }>) {
     const composerId = r.key.split(":")[1];
     if (!composerId) continue;
-    const folder = folderForComposer(composerMeta(r.value));
-    if (folder) map.set(composerId, repoIdForPath(folder));
+    const meta = composerMeta(r.value);
+    const folder = folderForComposer(meta);
+    if (folder) repo.set(composerId, repoIdForPath(folder));
+    if (meta.updatedAt !== null) time.set(composerId, meta.updatedAt);
   }
-  return map;
+  return { repo, time };
 }
 
 /** The repo id for a raw Cursor key, using a composerId->repo map. null for non-conversation rows. */

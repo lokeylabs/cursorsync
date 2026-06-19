@@ -20,6 +20,8 @@ export interface PanelState {
   user: AuthUser | null;
   autoSync: boolean;
   autoSyncNew: boolean;
+  /** Rolling sync window in days (0 = all history). */
+  windowDays: number;
   repos: RepoEntry[];
   repo: string | null;
   status: "idle" | "syncing" | "error";
@@ -38,6 +40,7 @@ export interface PanelActions {
   setRepoEnabled(repo: string, enabled: boolean): void;
   setAutoSyncNew(enabled: boolean): void;
   setAutoSync(value: boolean): void;
+  setWindow(days: number): void;
   openDetails(repo: string): void;
   resyncAll(): void;
 }
@@ -76,6 +79,8 @@ export class PanelProvider implements vscode.WebviewViewProvider {
           return this.actions.setAutoSyncNew(msg.value as boolean);
         case "setAutoSync":
           return this.actions.setAutoSync(msg.value as boolean);
+        case "setWindow":
+          return this.actions.setWindow(msg.value as number);
         case "openDetails":
           return this.actions.openDetails(msg.repo ?? "");
         case "resyncAll":

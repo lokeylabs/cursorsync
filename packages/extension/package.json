@@ -2,7 +2,7 @@
   "name": "cursorsync",
   "displayName": "Cursor Sync",
   "description": "Sync your Cursor chat history across all your devices.",
-  "version": "0.1.22",
+  "version": "0.1.23",
   "license": "MIT",
   "publisher": "lokeylabs",
   "repository": {
@@ -87,10 +87,16 @@
           "default": true,
           "description": "Automatically push new chats and pull remote changes in the background."
         },
+        "cursorsync.syncWindowDays": {
+          "type": "number",
+          "default": 90,
+          "minimum": 0,
+          "description": "Rolling window: only sync conversations active within this many days. 0 = sync all history (can be very large). Older chats already in the cloud stay there forever."
+        },
         "cursorsync.syncAgentArtifacts": {
           "type": "boolean",
-          "default": true,
-          "description": "Sync agent tool-result traces (agentKv). Stored content-addressed in object storage so it stays lightweight. On by default for full-fidelity sync."
+          "default": false,
+          "description": "Sync agent tool-result traces (agentKv). These are large (often the biggest chunk of the DB — 10+ GB) and are internal tool-call data, not the readable chat. Off by default; turn on for full fidelity."
         },
         "cursorsync.syncFileSnapshots": {
           "type": "boolean",

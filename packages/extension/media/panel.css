@@ -213,6 +213,35 @@ body {
   cursor: default;
 }
 
+/* ---- segmented control (sync window) ---- */
+.seg {
+  display: flex;
+  background: var(--vscode-input-background, rgba(127, 127, 127, 0.12));
+  border-radius: 8px;
+  padding: 3px;
+  gap: 2px;
+}
+.seg-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 6px 2px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+  opacity: 0.65;
+  white-space: nowrap;
+}
+.seg-btn.active {
+  background: var(--grad);
+  color: #fff;
+  opacity: 1;
+  font-weight: 600;
+}
+
 /* ---- synced repos ---- */
 .auto-new {
   padding-bottom: 9px;

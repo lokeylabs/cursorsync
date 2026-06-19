@@ -5,6 +5,8 @@ export interface ExtensionConfig {
   supabaseUrl: string;
   supabaseAnonKey: string;
   autoSync: boolean;
+  /** Rolling window: only sync conversations active within this many days (0 = no limit). */
+  syncWindowDays: number;
   policy: SyncPolicy;
 }
 
@@ -15,8 +17,9 @@ export function getConfig(): ExtensionConfig {
     supabaseUrl: c.get<string>("supabaseUrl", ""),
     supabaseAnonKey: c.get<string>("supabaseAnonKey", ""),
     autoSync: c.get<boolean>("autoSync", true),
+    syncWindowDays: c.get<number>("syncWindowDays", 90),
     policy: {
-      agentArtifacts: c.get<boolean>("syncAgentArtifacts", true),
+      agentArtifacts: c.get<boolean>("syncAgentArtifacts", false),
       fileSnapshots: c.get<boolean>("syncFileSnapshots", false),
       uiState: c.get<boolean>("syncUiState", false),
     },

@@ -7,7 +7,7 @@ import {
   defaultGlobalDbPath,
   SOURCES,
   tableForSource,
-  buildComposerRepoMap,
+  buildComposerInfo,
   repoForKey,
   composerMeta,
   composerDetail,
@@ -89,8 +89,11 @@ const DETAILS_CONV_CAP = 400;
  * Cursor surfaces newly-written chats after a restart.
  */
 export class SyncBridge {
-  /** composerId→repo map cached and invalidated by the composerData max rowid (cheap to check). */
-  private composerRepoCache?: { maxRowid: number; map: Map<string, string> };
+  /** composerId→{repo,time} maps cached and invalidated by the composerData max rowid. */
+  private composerInfoCache?: {
+    maxRowid: number;
+    info: { repo: Map<string, string>; time: Map<string, number> };
+  };
   /** id→content-hash of what we've already uploaded, so unchanged rows aren't re-pushed. */
   private pushCacheInstance?: PushCache;
 
@@ -153,21 +156,24 @@ export class SyncBridge {
   }
 
   /**
-   * composerId→repo map, rebuilt only when conversations changed. composerData rows REPLACE on edit
-   * (bumping rowid), so MAX(rowid) over that namespace is a cheap, correct cache key — avoids
-   * rescanning ~160 MB of composers on every background sync tick.
+   * composerId→{repo,time} maps, rebuilt only when conversations changed. composerData rows REPLACE
+   * on edit (bumping rowid), so MAX(rowid) over that namespace is a cheap, correct cache key —
+   * avoids rescanning ~180 MB of composers on every sync tick.
    */
-  private getComposerRepoMap(db: ReturnType<typeof openReadonly>): Map<string, string> {
+  private getComposerInfo(db: ReturnType<typeof openReadonly>): {
+    repo: Map<string, string>;
+    time: Map<string, number>;
+  } {
     const row = db
       .prepare(
         "SELECT MAX(rowid) AS m FROM cursorDiskKV WHERE key >= 'composerData:' AND key < 'composerData:~'",
       )
       .get() as { m: number | null };
     const maxRowid = row.m ?? 0;
-    if (this.composerRepoCache?.maxRowid === maxRowid) return this.composerRepoCache.map;
-    const map = buildComposerRepoMap(db);
-    this.composerRepoCache = { maxRowid, map };
-    return map;
+    if (this.composerInfoCache?.maxRowid === maxRowid) return this.composerInfoCache.info;
+    const info = buildComposerInfo(db);
+    this.composerInfoCache = { maxRowid, info };
+    return info;
   }
 
   /**
@@ -204,13 +210,15 @@ export class SyncBridge {
     ownerId: string,
     prefs: Map<string, boolean>,
     policy: SyncPolicy,
+    windowDays: number,
     maxRows = Infinity,
     onBatch?: () => void,
   ): Promise<UpResult> {
     const db = openReadonly();
     const cache = this.pushCache();
+    const cutoff = windowDays > 0 ? Date.now() - windowDays * 86_400_000 : 0;
     try {
-      const composerRepo = this.getComposerRepoMap(db);
+      const info = this.getComposerInfo(db);
       let state = this.getWatermark();
       let pushed = 0;
       let scanned = 0;
@@ -241,8 +249,14 @@ export class SyncBridge {
               composerMeta(r.value ?? null).messageCount === 0
             )
               continue; // skip empty "new chat" stubs
-            const repo = repoForKey(r.key, composerRepo);
-            if (isConversationKey(r.key) && !repoEnabled(repo, prefs)) continue; // disabled repo
+            const repo = repoForKey(r.key, info.repo);
+            if (isConversationKey(r.key)) {
+              if (cutoff > 0) {
+                const t = info.time.get(r.key.split(":")[1] ?? "");
+                if (t !== undefined && t < cutoff) continue; // older than the rolling window
+              }
+              if (!repoEnabled(repo, prefs)) continue; // disabled repo
+            }
             const id = `${ownerId}:${source}:${r.key}`;
             const bytes =
               r.value === null

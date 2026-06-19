@@ -45,6 +45,25 @@
       </div>`;
   }
 
+  const WINDOWS = [
+    [30, "1 mo"],
+    [90, "3 mo"],
+    [180, "6 mo"],
+    [365, "1 yr"],
+    [0, "All"],
+  ];
+  function windowCard(s) {
+    const btns = WINDOWS.map(
+      ([d, label]) =>
+        `<button class="seg-btn ${s.windowDays === d ? "active" : ""}" data-action="setWindow" data-days="${d}">${label}</button>`,
+    ).join("");
+    return `
+      <div class="card">
+        <div class="row-label">Sync window <span class="help" title="Only chats active within this window sync to keep things light. Anything already in the cloud stays there forever.">?</span></div>
+        <div class="seg">${btns}</div>
+      </div>`;
+  }
+
   function reposCard(s) {
     const rows = (s.repos || []).map(repoRow).join("");
     const empty =
@@ -72,6 +91,8 @@
         </div>
         <button class="link" data-action="signOut">Sign out</button>
       </div>
+
+      ${windowCard(s)}
 
       ${reposCard(s)}
 
@@ -117,6 +138,8 @@
       const repo = el.getAttribute("data-repo");
       const entry = (state.repos || []).find((r) => r.repo === repo);
       vscode.postMessage({ type: "setRepoEnabled", repo, value: !(entry && entry.enabled) });
+    } else if (action === "setWindow") {
+      vscode.postMessage({ type: "setWindow", value: Number(el.getAttribute("data-days")) });
     } else if (action === "openDetails") {
       vscode.postMessage({ type: "openDetails", repo: el.getAttribute("data-repo") });
     } else if (action === "toggleAutoNew") {

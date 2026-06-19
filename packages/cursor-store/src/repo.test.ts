@@ -19,23 +19,28 @@ describe("normalizeRemote", () => {
 });
 
 describe("composerMeta", () => {
-  it("extracts workspace path and message count", () => {
+  it("extracts workspace path, message count, and last-activity time", () => {
     const v = JSON.stringify({
       workspaceIdentifier: { uri: { fsPath: "/Users/x/proj" } },
       fullConversationHeadersOnly: [1, 2, 3],
+      lastUpdatedAt: 1700000000000,
+      createdAt: 1600000000000,
     });
     const meta = composerMeta(v);
     expect(meta.fsPath).toBe("/Users/x/proj");
     expect(meta.messageCount).toBe(3);
+    expect(meta.updatedAt).toBe(1700000000000); // prefers lastUpdatedAt
     expect(composerMeta(Buffer.from(v)).fsPath).toBe("/Users/x/proj");
   });
 
-  it("flags empty stubs (0 messages) and handles bad input", () => {
+  it("falls back to createdAt for time, and handles bad input", () => {
+    expect(composerMeta(JSON.stringify({ createdAt: 42 })).updatedAt).toBe(42);
     expect(composerMeta(JSON.stringify({ other: 1 })).messageCount).toBe(0);
     expect(composerMeta("not json")).toEqual({
       fsPath: null,
       trackedRepoPath: null,
       messageCount: 0,
+      updatedAt: null,
     });
     expect(composerMeta(null).messageCount).toBe(0);
   });
@@ -54,12 +59,9 @@ describe("composerMeta", () => {
 
 describe("folderForComposer", () => {
   it("prefers the recorded workspace, else the tracked repo, else null", () => {
-    expect(folderForComposer({ fsPath: "/ws", trackedRepoPath: "/git", messageCount: 1 })).toBe(
-      "/ws",
-    );
-    expect(folderForComposer({ fsPath: null, trackedRepoPath: "/git", messageCount: 1 })).toBe(
-      "/git",
-    );
-    expect(folderForComposer({ fsPath: null, trackedRepoPath: null, messageCount: 1 })).toBeNull();
+    const base = { messageCount: 1, updatedAt: null };
+    expect(folderForComposer({ ...base, fsPath: "/ws", trackedRepoPath: "/git" })).toBe("/ws");
+    expect(folderForComposer({ ...base, fsPath: null, trackedRepoPath: "/git" })).toBe("/git");
+    expect(folderForComposer({ ...base, fsPath: null, trackedRepoPath: null })).toBeNull();
   });
 });

@@ -85,6 +85,7 @@ export function activate(ctx: vscode.ExtensionContext) {
       user,
       autoSync: cfg.autoSync,
       autoSyncNew: autoSyncNew(prefs),
+      windowDays: cfg.syncWindowDays,
       repos: user ? buildRepoList() : [],
       repo: currentRepo(),
       status,
@@ -199,6 +200,7 @@ export function activate(ctx: vscode.ExtensionContext) {
         user.id,
         prefs,
         cfg.policy,
+        cfg.syncWindowDays,
         opts?.background ? BG_CAP : Infinity,
         refreshLease,
       );
@@ -330,6 +332,13 @@ export function activate(ctx: vscode.ExtensionContext) {
     pullNow: () => void doPull(),
     setRepoEnabled: (repo: string, enabled: boolean) => void applyPrefChange(repo, enabled),
     setAutoSyncNew: (enabled: boolean) => void applyPrefChange(DEFAULT_PREF_KEY, enabled),
+    setWindow: (days: number) =>
+      void updateConfig("syncWindowDays", days).then(async () => {
+        addLog(`Sync window: ${days === 0 ? "all history" : `${days} days`}`);
+        refresh();
+        await bridge.resetWatermark(); // re-scan so a wider window picks up older chats
+        void doUpSync();
+      }),
     openDetails: (repo: string) => {
       const details = bridge.repoDetails(repo);
       detailsPanel.show({
