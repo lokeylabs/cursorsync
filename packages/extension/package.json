@@ -95,16 +95,22 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "node esbuild.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "watch": "node esbuild.mjs --watch",
+    "vscode:prepublish": "node esbuild.mjs",
     "package": "vsce package --no-dependencies"
   },
   "dependencies": {
     "@cursorsync/cursor-store": "workspace:*",
     "@cursorsync/sync-engine": "workspace:*",
-    "@supabase/supabase-js": "^2.45.0"
+    "@supabase/supabase-js": "^2.45.0",
+    "better-sqlite3": "^12.11.1"
   },
   "devDependencies": {
+    "@electron/rebuild": "^3.6.0",
     "@types/vscode": "^1.90.0",
-    "@vscode/vsce": "^3.0.0"
+    "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.23.0"
   }
 }

@@ -19,3 +19,7 @@ out/
 # Supabase CLI local artifacts
 supabase/.temp/
 supabase/.branches/
+
+# Extension packaging artifacts
+packages/extension/.vsix-stage/
+*.vsix
