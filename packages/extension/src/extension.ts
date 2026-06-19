@@ -171,7 +171,8 @@ export function activate(ctx: vscode.ExtensionContext) {
     });
   }
 
-  const panel = new PanelProvider(ctx.extensionUri, {
+  const version = String((ctx.extension.packageJSON as { version?: string }).version ?? "0.0.0");
+  const panel = new PanelProvider(ctx.extensionUri, version, {
     signIn: () =>
       auth.signIn().catch((e) => vscode.window.showErrorMessage(`Sign-in: ${e.message}`)),
     signOut: () => auth.signOut(),

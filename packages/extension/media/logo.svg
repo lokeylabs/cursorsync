@@ -1,0 +1,35 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="12" y1="8" x2="116" y2="120" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8B5CF6" />
+      <stop offset="0.5" stop-color="#5B8CFF" />
+      <stop offset="1" stop-color="#22D3EE" />
+    </linearGradient>
+    <linearGradient id="gloss" x1="64" y1="6" x2="64" y2="74" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity="0.35" />
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0" />
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="1.1" />
+    </filter>
+  </defs>
+
+  <rect x="8" y="8" width="112" height="112" rx="30" fill="url(#bg)" />
+  <rect x="8" y="8" width="112" height="112" rx="30" fill="url(#gloss)" />
+  <rect x="8.75" y="8.75" width="110.5" height="110.5" rx="29.25" stroke="#ffffff" stroke-opacity="0.25" stroke-width="1.5" />
+
+  <g stroke="#ffffff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none" filter="url(#soft)" opacity="0.25">
+    <path d="M34 58a30 30 0 0 1 51-21l9 9" />
+    <path d="M94 70a30 30 0 0 1-51 21l-9-9" />
+  </g>
+  <g stroke="#ffffff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M34 58a30 30 0 0 1 51-21l9 9" />
+    <path d="M94 33v13h-13" />
+    <path d="M94 70a30 30 0 0 1-51 21l-9-9" />
+    <path d="M34 95V82h13" />
+    <path d="M64 44v40M55 44h18M55 84h18" />
+  </g>
+
+  <circle cx="64" cy="22" r="3.2" fill="#ffffff" />
+  <circle cx="64" cy="106" r="3.2" fill="#ffffff" fill-opacity="0.8" />
+</svg>

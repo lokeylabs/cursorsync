@@ -1,8 +1,8 @@
 {
   "name": "cursorsync",
-  "displayName": "cursorsync",
+  "displayName": "Cursor Sync",
   "description": "Sync your Cursor chat history across all your devices.",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "license": "MIT",
   "publisher": "lokeylabs",
   "repository": {
@@ -24,7 +24,7 @@
       "activitybar": [
         {
           "id": "cursorsync",
-          "title": "cursorsync",
+          "title": "Cursor Sync",
           "icon": "media/icon.svg"
         }
       ]
@@ -65,7 +65,7 @@
       }
     ],
     "configuration": {
-      "title": "cursorsync",
+      "title": "Cursor Sync",
       "properties": {
         "cursorsync.supabaseUrl": {
           "type": "string",
