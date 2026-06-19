@@ -6,6 +6,7 @@ import { Transport } from "./transport.js";
 import { SyncBridge } from "./bridge.js";
 import { PanelProvider, type PanelState } from "./webview.js";
 import { getConfig, updateConfig, type SyncScope } from "./config.js";
+import type { KvRecord } from "@cursorsync/sync-engine";
 
 export function activate(ctx: vscode.ExtensionContext) {
   const deviceId = getDeviceId(ctx);
@@ -99,19 +100,40 @@ export function activate(ctx: vscode.ExtensionContext) {
     }
   }
 
+  // Debounced down-sync: coalesce a burst of live records into one DB transaction.
+  let downBuffer: KvRecord[] = [];
+  let flushTimer: NodeJS.Timeout | undefined;
+  async function flushDown() {
+    if (flushTimer) {
+      clearTimeout(flushTimer);
+      flushTimer = undefined;
+    }
+    if (downBuffer.length === 0) return;
+    const batch = downBuffer;
+    downBuffer = [];
+    try {
+      const n = await bridge.applyRecords(batch);
+      stats.pulled += n;
+      addLog(`Live: applied ${n} rows`);
+      refresh();
+    } catch (e) {
+      addLog(`Apply error: ${(e as Error).message}`);
+    }
+  }
+  function queueDown(rec: KvRecord) {
+    downBuffer.push(rec);
+    if (downBuffer.length >= 200) return void flushDown();
+    if (flushTimer) clearTimeout(flushTimer);
+    flushTimer = setTimeout(() => void flushDown(), 1500);
+  }
+  ctx.subscriptions.push({ dispose: () => flushTimer && clearTimeout(flushTimer) });
+
   function subscribeRealtime() {
     realtime?.unsubscribe();
     if (!user || !getConfig().autoSync) return;
     realtime = transport.subscribe(user.id, (rec) => {
       if (rec.device_id === deviceId) return; // ignore our own writes
-      bridge
-        .applyRecords([rec])
-        .then(() => {
-          stats.pulled += 1;
-          addLog(`Live: ${rec.ckey.slice(0, 40)}`);
-          refresh();
-        })
-        .catch((e) => addLog(`Apply error: ${(e as Error).message}`));
+      queueDown(rec);
     });
   }
 
