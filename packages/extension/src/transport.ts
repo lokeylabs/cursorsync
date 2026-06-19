@@ -95,9 +95,10 @@ export class Transport {
         if (error) throw new Error(error.message);
         return (data ?? []) as KvRecord[];
       }, "pull");
-      if (page.length === 0) return;
+      const last = page[page.length - 1];
+      if (last === undefined) return;
       yield page;
-      lastId = page[page.length - 1]!.id;
+      lastId = last.id;
       if (page.length < pageSize) return;
     }
   }

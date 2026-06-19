@@ -10,7 +10,9 @@ follow you from machine to machine — sign in once with GitHub and your history
 
 - **Sign in with GitHub** — one click, OAuth via Supabase. Your data is row-level-security scoped
   to your account; nobody else can read it.
-- **Sync everything** — every conversation, message, and agent trace (not a curated subset).
+- **Full-fidelity sync** — conversations, messages, and agent tool-result traces. Large/binary data
+  (agent traces) is stored content-addressed in object storage, so 100% sync stays lightweight and
+  never bloats the database. (Regenerable file snapshots and per-machine UI state are excluded.)
 - **Scope toggle** — sync **all chats**, or **isolate to the current repo** (matched by git remote,
   so the same repo lines up across machines).
 - **Two-way** — push your local chats to the cloud and pull chats made on other devices.

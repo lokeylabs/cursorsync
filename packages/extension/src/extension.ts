@@ -184,7 +184,13 @@ export function activate(ctx: vscode.ExtensionContext) {
 
   ctx.subscriptions.push(
     vscode.window.registerWebviewViewProvider("cursorsync.panel", panel),
-    vscode.window.registerUriHandler({ handleUri: (uri) => void auth.handleUri(uri) }),
+    vscode.window.registerUriHandler({
+      handleUri: (uri) =>
+        void auth.handleUri(uri).catch((e: unknown) => {
+          out.appendLine(`auth callback error: ${(e as Error).message}`);
+          void vscode.window.showErrorMessage(`cursorsync sign-in failed: ${(e as Error).message}`);
+        }),
+    }),
     vscode.commands.registerCommand("cursorsync.signIn", () => auth.signIn()),
     vscode.commands.registerCommand("cursorsync.signOut", () => auth.signOut()),
     vscode.commands.registerCommand("cursorsync.syncNow", () => doUpSync()),
@@ -220,11 +226,14 @@ export function activate(ctx: vscode.ExtensionContext) {
   ctx.subscriptions.push({ dispose: () => clearInterval(timer) });
 
   // Restore any existing session.
-  auth.currentUser().then((u) => {
-    user = u;
-    subscribeRealtime();
-    refresh();
-  });
+  auth
+    .currentUser()
+    .then((u) => {
+      user = u;
+      subscribeRealtime();
+      refresh();
+    })
+    .catch((e: unknown) => out.appendLine(`session restore error: ${(e as Error).message}`));
   refresh();
 }
 

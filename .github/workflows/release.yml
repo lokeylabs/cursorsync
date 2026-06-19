@@ -1,0 +1,55 @@
+name: Release VSIX
+
+# Builds the packaged .vsix on macOS (where the better-sqlite3 native module is rebuilt for the
+# editor's Electron ABI). Run manually with the target Electron version, or on a v* tag.
+on:
+  workflow_dispatch:
+    inputs:
+      electron_version:
+        description: "Electron version to rebuild better-sqlite3 against (e.g. 40.10.3)"
+        required: true
+        default: "40.10.3"
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: macos-14
+    env:
+      ELECTRON_VERSION: ${{ github.event.inputs.electron_version || '40.10.3' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install + build + verify
+        run: |
+          pip install setuptools   # node-gyp needs distutils on Python >= 3.12
+          pnpm install --frozen-lockfile
+          pnpm build && pnpm lint && pnpm typecheck && pnpm test
+
+      - name: Rebuild native module for Electron
+        working-directory: packages/extension
+        run: |
+          rm -rf .vsix-stage && mkdir -p .vsix-stage && cd .vsix-stage
+          echo '{"name":"stage","private":true,"version":"1.0.0"}' > package.json
+          npm install better-sqlite3@12 --no-audit --no-fund
+          npx --yes @electron/rebuild@3 -v "$ELECTRON_VERSION" -f -w better-sqlite3
+
+      - name: Package VSIX
+        working-directory: packages/extension
+        run: node esbuild.mjs && node scripts/package.mjs
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cursorsync-vsix
+          path: packages/extension/.vsix-stage/*.vsix

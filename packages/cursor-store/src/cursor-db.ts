@@ -1,9 +1,7 @@
 import Database from "better-sqlite3";
 import { homedir, platform } from "node:os";
 import { join } from "node:path";
-import { copyFileSync, existsSync, mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { SOURCES, tableForSource, type KvRow, type Source } from "./types.js";
+import { existsSync } from "node:fs";
 
 /**
  * Default location of Cursor's global state DB per platform.
@@ -48,22 +46,6 @@ export function openReadonly(dbPath = defaultGlobalDbPath()): Database.Database 
 }
 
 /**
- * Take a consistent point-in-time copy via SQLite's online backup, then open the copy.
- * Use this for heavy full-table extraction during active writes. Caller deletes the temp dir.
- */
-export function snapshotAndOpen(dbPath = defaultGlobalDbPath()): {
-  db: Database.Database;
-  copyPath: string;
-} {
-  const dir = mkdtempSync(join(tmpdir(), "cursorsync-"));
-  const copyPath = join(dir, "state.snapshot.vscdb");
-  // better-sqlite3's backup is async; for a simple, dependency-light copy we lean on the OS copy
-  // plus WAL checkpoint readonly semantics. For very hot DBs prefer db.backup() (see TODO).
-  copyFileSync(dbPath, copyPath);
-  return { db: new Database(copyPath, { readonly: true }), copyPath };
-}
-
-/**
  * Consistent online backup of the live DB to `destPath` (safe while Cursor is running).
  * Uses SQLite's backup API, so the result is a clean, restorable single-file snapshot.
  */
@@ -77,22 +59,4 @@ export async function backupDatabase(
   } finally {
     db.close();
   }
-}
-
-/** Stream every row of one source (table), as raw key/value. */
-export function* readSource(db: Database.Database, source: Source): Generator<KvRow> {
-  const table = tableForSource(source);
-  const stmt = db.prepare(`SELECT rowid AS rowid, key, value FROM "${table}"`);
-  for (const r of stmt.iterate() as IterableIterator<{
-    rowid: number;
-    key: string;
-    value: Buffer | string | null;
-  }>) {
-    yield { source, key: r.key, rowid: r.rowid, value: r.value ?? null };
-  }
-}
-
-/** Stream every row of every source — a full snapshot of Cursor's state. */
-export function* readAllRows(db: Database.Database): Generator<KvRow> {
-  for (const source of SOURCES) yield* readSource(db, source);
 }

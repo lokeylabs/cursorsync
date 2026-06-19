@@ -20,7 +20,7 @@ export function getConfig(): ExtensionConfig {
     autoSync: c.get<boolean>("autoSync", true),
     syncScope: c.get<SyncScope>("syncScope", "all"),
     policy: {
-      agentArtifacts: c.get<boolean>("syncAgentArtifacts", false),
+      agentArtifacts: c.get<boolean>("syncAgentArtifacts", true),
       fileSnapshots: c.get<boolean>("syncFileSnapshots", false),
       uiState: c.get<boolean>("syncUiState", false),
     },

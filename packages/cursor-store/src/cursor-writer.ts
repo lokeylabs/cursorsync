@@ -109,7 +109,13 @@ export function applyRows(
       table: string,
       cache: Map<string, Database.Statement>,
       sql: (t: string) => string,
-    ) => cache.get(table) ?? cache.set(table, db.prepare(sql(table))).get(table)!;
+    ): Database.Statement => {
+      const existing = cache.get(table);
+      if (existing) return existing;
+      const created = db.prepare(sql(table));
+      cache.set(table, created);
+      return created;
+    };
 
     const tx = db.transaction((items: WriteRow[]): number => {
       let n = 0;
