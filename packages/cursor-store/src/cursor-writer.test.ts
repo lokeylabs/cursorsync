@@ -51,14 +51,37 @@ describe("applyRows", () => {
     expect(count.n).toBe(2); // replace did not duplicate
   });
 
-  it("creates a backup before writing by default", () => {
-    const res = applyRows(dbPath, [{ key: "bubbleId:c1:m2", value: "{}" }]);
+  it("does not back up by default; opts in on request", () => {
+    expect(applyRows(dbPath, [{ key: "bubbleId:c1:m3", value: "{}" }]).backupPath).toBeUndefined();
+    const res = applyRows(dbPath, [{ key: "bubbleId:c1:m4", value: "{}" }], { backup: true });
     expect(res.backupPath).toBeDefined();
     expect(existsSync(res.backupPath!)).toBe(true);
   });
 
-  it("can skip the backup when asked", () => {
-    const res = applyRows(dbPath, [{ key: "bubbleId:c1:m3", value: "{}" }], { backup: false });
-    expect(res.backupPath).toBeUndefined();
+  it("captures undo only for state-changing writes", () => {
+    const res = applyRows(
+      dbPath,
+      [
+        { key: "composerData:c1", value: JSON.stringify({ title: "new" }) }, // overwrites -> undo prior
+        { key: "bubbleId:fresh", value: "{}" }, // new key -> undo (restore = absent)
+        { key: "composerData:c1", value: JSON.stringify({ title: "new" }) }, // identical now -> no undo
+      ],
+      { captureUndo: true },
+    );
+    const byKey = new Map(res.undo.map((u) => [u.key, u]));
+    expect(byKey.size).toBe(2);
+    const overwritten = byKey.get("composerData:c1")!;
+    expect(JSON.parse(Buffer.from(overwritten.valueB64!, "base64").toString())).toEqual({
+      title: "old",
+    });
+    expect(byKey.get("bubbleId:fresh")!.valueB64).toBeNull(); // was absent
+  });
+
+  it("refuses the live global DB unless explicitly allowed", () => {
+    const live = join(
+      process.env.HOME ?? "",
+      "Library/Application Support/Cursor/User/globalStorage/state.vscdb",
+    );
+    expect(() => applyRows(live, [{ key: "x", value: "{}" }])).toThrow(/Refusing to write/);
   });
 });
