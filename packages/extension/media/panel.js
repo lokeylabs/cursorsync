@@ -32,16 +32,15 @@
 
   function repoRow(r) {
     const badge = r.isCurrent ? ' <span class="badge">this window</span>' : "";
-    const reveal = r.path
-      ? `<button class="icon-btn" data-action="openRepo" data-path="${esc(r.path)}" title="Reveal in Finder" aria-label="Reveal ${esc(r.label)} in Finder">${ICON.folder}</button>`
-      : "";
+    const folders = r.folderCount > 1 ? ` · ${r.folderCount} folders` : "";
+    const details = `<button class="icon-btn" data-action="openDetails" data-repo="${esc(r.repo)}" title="View folders & chats" aria-label="Details for ${esc(r.label)}">${ICON.folder}</button>`;
     return `
       <div class="repo-row">
         <div class="repo-info">
           <div class="repo-name truncate" title="${esc(r.repo || "No repo")}">${esc(r.label)}${badge}</div>
-          <div class="repo-count">${Number(r.count).toLocaleString()} chat${r.count === 1 ? "" : "s"}</div>
+          <div class="repo-count">${Number(r.count).toLocaleString()} chat${r.count === 1 ? "" : "s"}${folders}</div>
         </div>
-        ${reveal}
+        ${details}
         <div class="toggle sm ${r.enabled ? "on" : ""}" data-action="toggleRepo" data-repo="${esc(r.repo)}" role="switch" aria-checked="${r.enabled}"><div class="knob"></div></div>
       </div>`;
   }
@@ -117,8 +116,8 @@
       const repo = el.getAttribute("data-repo");
       const entry = (state.repos || []).find((r) => r.repo === repo);
       vscode.postMessage({ type: "setRepoEnabled", repo, value: !(entry && entry.enabled) });
-    } else if (action === "openRepo") {
-      vscode.postMessage({ type: "openRepo", path: el.getAttribute("data-path") });
+    } else if (action === "openDetails") {
+      vscode.postMessage({ type: "openDetails", repo: el.getAttribute("data-repo") });
     } else if (action === "toggleAutoNew") {
       vscode.postMessage({ type: "setAutoSyncNew", value: !state.autoSyncNew });
     } else if (action === "toggleAuto") {

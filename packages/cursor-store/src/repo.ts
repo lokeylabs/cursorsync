@@ -55,6 +55,40 @@ export function folderForComposer(meta: ComposerMeta): string | null {
   return meta.fsPath ?? meta.trackedRepoPath;
 }
 
+export interface ComposerDetail {
+  name: string;
+  createdAt: number | null;
+  messageCount: number;
+  /** Resolved folder (workspace or tracked repo), or null. */
+  folder: string | null;
+  /** Best-effort folders referenced in the conversation's context (for locating "no repo" chats). */
+  contextHints: string[];
+}
+
+// Paths under these are noise for "where did this chat happen" hints.
+const HINT_NOISE = /\/(Downloads|\.cursor|\.Trash|Library|node_modules)(\/|$)/i;
+
+/** Richer per-conversation info for the details pop-out (cold path — not used during sync). */
+export function composerDetail(value: Buffer | string | null): ComposerDetail {
+  const obj = asJson(value);
+  const meta = composerMeta(value);
+  const name = ((obj?.["name"] as string) || "").trim() || "(untitled)";
+  const createdAt = typeof obj?.["createdAt"] === "number" ? (obj["createdAt"] as number) : null;
+  const ctx = JSON.stringify(obj?.["context"] ?? {});
+  const dirs = new Set<string>();
+  for (const p of ctx.match(/\/Users\/[^"\\]+/g) ?? []) {
+    const dir = p.replace(/\/[^/]*$/, ""); // dirname
+    if (dir && !HINT_NOISE.test(dir)) dirs.add(dir);
+  }
+  return {
+    name,
+    createdAt,
+    messageCount: meta.messageCount,
+    folder: folderForComposer(meta),
+    contextHints: [...dirs].slice(0, 5),
+  };
+}
+
 /**
  * Normalize a git remote URL into a stable, host/owner/name identity:
  *   git@github.com:Owner/Repo.git  ->  github.com/owner/repo

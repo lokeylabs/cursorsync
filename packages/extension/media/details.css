@@ -1,0 +1,112 @@
+body {
+  font-family: var(--vscode-font-family);
+  color: var(--vscode-foreground);
+  font-size: 13px;
+  margin: 0;
+  padding: 20px 24px;
+  max-width: 920px;
+}
+* {
+  box-sizing: border-box;
+  min-width: 0;
+}
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+header {
+  border-bottom: 1px solid var(--vscode-widget-border, rgba(127, 127, 127, 0.2));
+  padding-bottom: 14px;
+  margin-bottom: 18px;
+}
+h1 {
+  font-size: 20px;
+  margin: 0 0 4px;
+}
+.repoid {
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 12px;
+  opacity: 0.6;
+}
+.section {
+  margin-bottom: 24px;
+}
+h2 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  opacity: 0.6;
+  margin: 0 0 10px;
+}
+.frow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 11px;
+  border: 1px solid var(--vscode-widget-border, rgba(127, 127, 127, 0.18));
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+.fpath {
+  flex: 1 1 auto;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 12px;
+}
+.btn-sm {
+  flex: 0 0 auto;
+  font: inherit;
+  font-size: 11px;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 11px;
+  cursor: pointer;
+  background: var(--vscode-button-secondaryBackground, rgba(127, 127, 127, 0.18));
+  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+}
+.btn-sm:hover {
+  filter: brightness(1.18);
+}
+.crow {
+  padding: 9px 2px;
+  border-bottom: 1px solid var(--vscode-widget-border, rgba(127, 127, 127, 0.12));
+}
+.cmain {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.cname {
+  flex: 1 1 auto;
+  font-weight: 600;
+}
+.cmeta {
+  flex: 0 0 auto;
+  font-size: 11px;
+  opacity: 0.55;
+}
+.chints {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.chip {
+  font: inherit;
+  font-size: 10.5px;
+  font-family: var(--vscode-editor-font-family, monospace);
+  border: 1px solid var(--vscode-widget-border, rgba(127, 127, 127, 0.25));
+  border-radius: 999px;
+  padding: 2px 9px;
+  cursor: pointer;
+  background: transparent;
+  color: var(--vscode-foreground);
+  opacity: 0.8;
+}
+.chip:hover {
+  opacity: 1;
+  background: var(--vscode-toolbar-hoverBackground, rgba(127, 127, 127, 0.18));
+}
+.muted {
+  opacity: 0.6;
+}

@@ -1,11 +1,11 @@
 import * as vscode from "vscode";
 import { hostname } from "node:os";
-import { existsSync } from "node:fs";
 import { repoIdForPath } from "@cursorsync/cursor-store";
 import { AuthManager, type AuthUser } from "./auth.js";
 import { Transport } from "./transport.js";
 import { SyncBridge } from "./bridge.js";
 import { PanelProvider, type PanelState, type RepoEntry } from "./webview.js";
+import { RepoDetailsPanel } from "./details-panel.js";
 import { getConfig, updateConfig } from "./config.js";
 import {
   repoEnabled,
@@ -32,8 +32,9 @@ export function activate(ctx: vscode.ExtensionContext) {
   // Per-repo allowlist (synced via repo_prefs) + merged repo→chat-count for the panel list.
   let prefs = new Map<string, boolean>();
   let repoCounts = new Map<string, number>();
-  // Representative local folder path per repo, for "reveal in Finder" (local repos only).
-  let repoPaths = new Map<string, string>();
+  // Distinct local folder copies per repo (for the row badge + details pop-out).
+  let repoFolders = new Map<string, Set<string>>();
+  const detailsPanel = new RepoDetailsPanel(ctx.extensionUri);
 
   // LogOutputChannel — visible via Output → "cursorsync" AND persisted to disk for diagnostics.
   const out = vscode.window.createOutputChannel("cursorsync", { log: true });
@@ -67,7 +68,7 @@ export function activate(ctx: vscode.ExtensionContext) {
           count,
           enabled: repoEnabled(repo === NO_REPO_KEY ? null : repo, prefs),
           isCurrent: repo !== NO_REPO_KEY && repo === cur,
-          path: repoPaths.get(repo) ?? null,
+          folderCount: repoFolders.get(repo)?.size ?? 0,
         }),
       )
       .sort((a, b) => Number(b.isCurrent) - Number(a.isCurrent) || b.count - a.count);
@@ -106,7 +107,7 @@ export function activate(ctx: vscode.ExtensionContext) {
       ]);
       prefs = new Map(prefRows.map((p) => [p.repo, p.enabled]));
       const local = bridge.localRepos();
-      repoPaths = local.paths;
+      repoFolders = local.folders;
       const counts = new Map<string, number>();
       for (const [repo, n] of local.counts) counts.set(repo, n);
       for (const { repo, n } of backendCounts) {
@@ -255,15 +256,14 @@ export function activate(ctx: vscode.ExtensionContext) {
     pullNow: () => void doPull(),
     setRepoEnabled: (repo: string, enabled: boolean) => void applyPrefChange(repo, enabled),
     setAutoSyncNew: (enabled: boolean) => void applyPrefChange(DEFAULT_PREF_KEY, enabled),
-    openRepo: (path: string) => {
-      if (!path) return;
-      if (!existsSync(path)) {
-        void vscode.window.showWarningMessage(
-          `Cursor Sync: that folder no longer exists — ${path}`,
-        );
-        return;
-      }
-      void vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(path));
+    openDetails: (repo: string) => {
+      const details = bridge.repoDetails(repo);
+      detailsPanel.show({
+        label: prettyRepo(repo),
+        repoId: repo,
+        isOther: repo === NO_REPO_KEY,
+        ...details,
+      });
     },
     setAutoSync: (v: boolean) =>
       updateConfig("autoSync", v).then(() => (subscribeRealtime(), refresh())),

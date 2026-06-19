@@ -10,6 +10,7 @@ import {
   buildComposerRepoMap,
   repoForKey,
   composerMeta,
+  composerDetail,
   folderForComposer,
   repoIdForPath,
   applyRows,
@@ -53,6 +54,24 @@ export interface UpResult {
   pushed: number;
   scanned: number;
 }
+
+/** One conversation in the repo-details pop-out. */
+export interface ConvRow {
+  name: string;
+  created: number | null;
+  msgs: number;
+  /** Location hints (for "no repo" chats); empty for chats that have a folder. */
+  hints: string[];
+}
+
+/** Everything the details pop-out shows for one repo. */
+export interface RepoDetails {
+  folders: string[];
+  conversations: ConvRow[];
+  truncated: boolean;
+}
+
+const DETAILS_CONV_CAP = 400;
 
 /**
  * Orchestrates sync between Cursor's local state.vscdb and the Supabase hub.
@@ -218,11 +237,11 @@ export class SyncBridge {
    * count per repo (NO_REPO_KEY for those with no git repo) and a representative local folder path
    * per repo (for "reveal in Finder"). Remote resolution is cached per folder, so this is cheap.
    */
-  localRepos(): { counts: Map<string, number>; paths: Map<string, string> } {
+  localRepos(): { counts: Map<string, number>; folders: Map<string, Set<string>> } {
     const db = openReadonly();
     try {
       const counts = new Map<string, number>();
-      const paths = new Map<string, string>();
+      const folders = new Map<string, Set<string>>();
       const stmt = db.prepare(
         "SELECT value FROM cursorDiskKV WHERE key >= 'composerData:' AND key < 'composerData:~' AND value IS NOT NULL",
       );
@@ -232,9 +251,53 @@ export class SyncBridge {
         const folder = folderForComposer(meta);
         const repo = folder ? repoIdForPath(folder) : NO_REPO_KEY;
         counts.set(repo, (counts.get(repo) ?? 0) + 1);
-        if (folder && !paths.has(repo)) paths.set(repo, folder);
+        if (folder) {
+          let set = folders.get(repo);
+          if (!set) {
+            set = new Set();
+            folders.set(repo, set);
+          }
+          set.add(folder);
+        }
       }
-      return { counts, paths };
+      return { counts, folders };
+    } finally {
+      db.close();
+    }
+  }
+
+  /**
+   * Full detail for one repo (or the NO_REPO_KEY bucket): every local folder copy it lives in, and
+   * its conversations (title, date, size, and — for folderless chats — location hints to track them
+   * down). On-demand for the details pop-out; conversations are capped to stay bounded.
+   */
+  repoDetails(repoId: string): RepoDetails {
+    const db = openReadonly();
+    try {
+      const folders = new Set<string>();
+      const conversations: ConvRow[] = [];
+      const stmt = db.prepare(
+        "SELECT value FROM cursorDiskKV WHERE key >= 'composerData:' AND key < 'composerData:~' AND value IS NOT NULL",
+      );
+      for (const r of stmt.iterate() as IterableIterator<{ value: Buffer | string }>) {
+        const d = composerDetail(r.value);
+        if (d.messageCount === 0) continue;
+        const id = d.folder ? repoIdForPath(d.folder) : NO_REPO_KEY;
+        if (id !== repoId) continue;
+        if (d.folder) folders.add(d.folder);
+        conversations.push({
+          name: d.name,
+          created: d.createdAt,
+          msgs: d.messageCount,
+          hints: d.folder ? [] : d.contextHints,
+        });
+      }
+      conversations.sort((a, b) => (b.created ?? 0) - (a.created ?? 0));
+      return {
+        folders: [...folders],
+        conversations: conversations.slice(0, DETAILS_CONV_CAP),
+        truncated: conversations.length > DETAILS_CONV_CAP,
+      };
     } finally {
       db.close();
     }

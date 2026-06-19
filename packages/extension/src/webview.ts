@@ -12,8 +12,8 @@ export interface RepoEntry {
   enabled: boolean;
   /** The repo open in this window (highlighted). */
   isCurrent: boolean;
-  /** A representative local folder path, for "reveal in Finder"; null if not on this machine. */
-  path: string | null;
+  /** How many distinct local folder copies this repo lives in (0 if only synced from elsewhere). */
+  folderCount: number;
 }
 
 export interface PanelState {
@@ -38,7 +38,7 @@ export interface PanelActions {
   setRepoEnabled(repo: string, enabled: boolean): void;
   setAutoSyncNew(enabled: boolean): void;
   setAutoSync(value: boolean): void;
-  openRepo(path: string): void;
+  openDetails(repo: string): void;
 }
 
 /** The cursorsync sidebar panel. */
@@ -56,31 +56,29 @@ export class PanelProvider implements vscode.WebviewViewProvider {
     this.view = view;
     view.webview.options = { enableScripts: true, localResourceRoots: [this.extensionUri] };
     view.webview.html = this.html(view.webview);
-    view.webview.onDidReceiveMessage(
-      (msg: { type: string; value?: unknown; repo?: string; path?: string }) => {
-        switch (msg.type) {
-          case "ready":
-            if (this.last) this.postState(this.last);
-            break;
-          case "signIn":
-            return this.actions.signIn();
-          case "signOut":
-            return this.actions.signOut();
-          case "syncNow":
-            return this.actions.syncNow();
-          case "pullNow":
-            return this.actions.pullNow();
-          case "setRepoEnabled":
-            return this.actions.setRepoEnabled(msg.repo ?? "", msg.value as boolean);
-          case "setAutoSyncNew":
-            return this.actions.setAutoSyncNew(msg.value as boolean);
-          case "setAutoSync":
-            return this.actions.setAutoSync(msg.value as boolean);
-          case "openRepo":
-            return this.actions.openRepo(msg.path ?? "");
-        }
-      },
-    );
+    view.webview.onDidReceiveMessage((msg: { type: string; value?: unknown; repo?: string }) => {
+      switch (msg.type) {
+        case "ready":
+          if (this.last) this.postState(this.last);
+          break;
+        case "signIn":
+          return this.actions.signIn();
+        case "signOut":
+          return this.actions.signOut();
+        case "syncNow":
+          return this.actions.syncNow();
+        case "pullNow":
+          return this.actions.pullNow();
+        case "setRepoEnabled":
+          return this.actions.setRepoEnabled(msg.repo ?? "", msg.value as boolean);
+        case "setAutoSyncNew":
+          return this.actions.setAutoSyncNew(msg.value as boolean);
+        case "setAutoSync":
+          return this.actions.setAutoSync(msg.value as boolean);
+        case "openDetails":
+          return this.actions.openDetails(msg.repo ?? "");
+      }
+    });
   }
 
   postState(state: PanelState): void {
