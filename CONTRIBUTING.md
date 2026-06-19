@@ -11,7 +11,7 @@ history. Contributions of all sizes are welcome.
 ## Getting started
 
 ```bash
-git clone https://github.com/hughesyadaddy/cursorsync.git
+git clone https://github.com/lokeylabs/cursorsync.git
 cd cursorsync
 pnpm install
 pnpm build          # builds all packages topologically

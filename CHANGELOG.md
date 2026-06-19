@@ -21,4 +21,4 @@ All notable changes to this project are documented here. The format is based on
 - Read-only extraction and up-sync delta detection are validated against a real 27 GB Cursor DB.
 - Down-sync writer, PowerSync/Supabase wiring, and `.vsix` packaging are in progress.
 
-[Unreleased]: https://github.com/hughesyadaddy/cursorsync/commits/main
+[Unreleased]: https://github.com/lokeylabs/cursorsync/commits/main

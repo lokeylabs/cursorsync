@@ -5,10 +5,10 @@
   "description": "Real-time, local-first sync of Cursor AI chat history across devices (PowerSync + Supabase)",
   "license": "MIT",
   "type": "module",
-  "homepage": "https://github.com/hughesyadaddy/cursorsync",
+  "homepage": "https://github.com/lokeylabs/cursorsync",
   "repository": {
     "type": "git",
-    "url": "https://github.com/hughesyadaddy/cursorsync.git"
+    "url": "https://github.com/lokeylabs/cursorsync.git"
   },
   "engines": {
     "node": ">=20",

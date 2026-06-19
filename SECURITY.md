@@ -16,7 +16,7 @@ we take security seriously.
 ## Reporting a vulnerability
 
 Please **do not open a public issue** for security problems. Instead, use GitHub's private
-[Security Advisories](https://github.com/hughesyadaddy/cursorsync/security/advisories/new) to
+[Security Advisories](https://github.com/lokeylabs/cursorsync/security/advisories/new) to
 report privately. We aim to acknowledge within 72 hours.
 
 When reporting, include: affected version/commit, reproduction steps, and impact assessment.

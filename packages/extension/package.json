@@ -7,7 +7,7 @@
   "publisher": "hughesyadaddy",
   "repository": {
     "type": "git",
-    "url": "https://github.com/hughesyadaddy/cursorsync.git"
+    "url": "https://github.com/lokeylabs/cursorsync.git"
   },
   "engines": {
     "vscode": "^1.90.0"
