@@ -63,6 +63,22 @@ export function snapshotAndOpen(dbPath = defaultGlobalDbPath()): {
   return { db: new Database(copyPath, { readonly: true }), copyPath };
 }
 
+/**
+ * Consistent online backup of the live DB to `destPath` (safe while Cursor is running).
+ * Uses SQLite's backup API, so the result is a clean, restorable single-file snapshot.
+ */
+export async function backupDatabase(
+  destPath: string,
+  srcPath = defaultGlobalDbPath(),
+): Promise<void> {
+  const db = new Database(srcPath, { readonly: true, fileMustExist: true });
+  try {
+    await db.backup(destPath);
+  } finally {
+    db.close();
+  }
+}
+
 /** Stream every row of one source (table), as raw key/value. */
 export function* readSource(db: Database.Database, source: Source): Generator<KvRow> {
   const table = tableForSource(source);

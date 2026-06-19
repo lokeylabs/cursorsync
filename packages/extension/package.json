@@ -2,7 +2,7 @@
   "name": "cursorsync",
   "displayName": "cursorsync",
   "description": "Sync your Cursor chat history across all your devices.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "MIT",
   "publisher": "hughesyadaddy",
   "repository": {
@@ -54,6 +54,10 @@
       {
         "command": "cursorsync.pullNow",
         "title": "cursorsync: Pull chats from cloud"
+      },
+      {
+        "command": "cursorsync.backupNow",
+        "title": "cursorsync: Back up local chats now"
       },
       {
         "command": "cursorsync.focus",

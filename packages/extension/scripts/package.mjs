@@ -43,8 +43,12 @@ writeFileSync(
 mkdirSync(join(stage, ".vscode"), { recursive: true });
 
 // 3. Package.
-execFileSync("npx", ["--yes", "@vscode/vsce", "package", "--allow-missing-repository", "--skip-license"], {
-  cwd: stage,
-  stdio: "inherit",
-});
+execFileSync(
+  "npx",
+  ["--yes", "@vscode/vsce", "package", "--allow-missing-repository", "--skip-license"],
+  {
+    cwd: stage,
+    stdio: "inherit",
+  },
+);
 console.log("\nVSIX written to", join(stage, `${pkg.name}-${pkg.version}.vsix`));

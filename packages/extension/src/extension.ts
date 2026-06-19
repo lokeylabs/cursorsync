@@ -104,14 +104,14 @@ export function activate(ctx: vscode.ExtensionContext) {
     if (!user || !getConfig().autoSync) return;
     realtime = transport.subscribe(user.id, (rec) => {
       if (rec.device_id === deviceId) return; // ignore our own writes
-      try {
-        bridge.applyRecords([rec]);
-        stats.pulled += 1;
-        addLog(`Live: ${rec.ckey.slice(0, 40)}`);
-        refresh();
-      } catch (e) {
-        addLog(`Apply error: ${(e as Error).message}`);
-      }
+      bridge
+        .applyRecords([rec])
+        .then(() => {
+          stats.pulled += 1;
+          addLog(`Live: ${rec.ckey.slice(0, 40)}`);
+          refresh();
+        })
+        .catch((e) => addLog(`Apply error: ${(e as Error).message}`));
     });
   }
 
@@ -133,6 +133,17 @@ export function activate(ctx: vscode.ExtensionContext) {
     vscode.commands.registerCommand("cursorsync.signOut", () => auth.signOut()),
     vscode.commands.registerCommand("cursorsync.syncNow", () => doUpSync()),
     vscode.commands.registerCommand("cursorsync.pullNow", () => doPull()),
+    vscode.commands.registerCommand("cursorsync.backupNow", async () => {
+      setStatus("syncing", "Backing up…");
+      const p = await bridge.ensureBackup(true);
+      addLog(p ? `Backed up local chats` : "Backup skipped (recent one exists)");
+      setStatus("idle", "Backup complete");
+      vscode.window.showInformationMessage(
+        p
+          ? `cursorsync backed up your chats to ${p}`
+          : "cursorsync: a recent backup already exists.",
+      );
+    }),
     vscode.commands.registerCommand("cursorsync.focus", () =>
       vscode.commands.executeCommand("cursorsync.panel.focus"),
     ),
