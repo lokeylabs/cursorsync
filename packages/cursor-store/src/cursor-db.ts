@@ -3,7 +3,7 @@ import { homedir, platform } from "node:os";
 import { join } from "node:path";
 import { copyFileSync, existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import type { BubbleRow, ChatRow, ComposerRow } from "./types.js";
+import { SOURCES, tableForSource, type KvRow, type Source } from "./types.js";
 
 /**
  * Default location of Cursor's global state DB per platform.
@@ -63,46 +63,20 @@ export function snapshotAndOpen(dbPath = defaultGlobalDbPath()): {
   return { db: new Database(copyPath, { readonly: true }), copyPath };
 }
 
-function parseJsonValue(raw: Buffer | string): unknown {
-  const text = typeof raw === "string" ? raw : raw.toString("utf8");
-  return JSON.parse(text);
-}
-
-/** Iterate all `bubbleId:*` rows (chat messages). */
-export function* readBubbles(db: Database.Database): Generator<BubbleRow> {
-  const stmt = db.prepare(
-    "SELECT key, value FROM cursorDiskKV WHERE key >= 'bubbleId:' AND key < 'bubbleId:~'",
-  );
-  for (const { key, value } of stmt.iterate() as IterableIterator<{ key: string; value: Buffer }>) {
-    const parts = key.split(":");
-    yield {
-      namespace: "bubbleId",
-      key,
-      composerId: parts[1] ?? "",
-      messageId: parts[2] ?? "",
-      value: parseJsonValue(value),
-    };
+/** Stream every row of one source (table), as raw key/value. */
+export function* readSource(db: Database.Database, source: Source): Generator<KvRow> {
+  const table = tableForSource(source);
+  const stmt = db.prepare(`SELECT rowid AS rowid, key, value FROM "${table}"`);
+  for (const r of stmt.iterate() as IterableIterator<{
+    rowid: number;
+    key: string;
+    value: Buffer | string | null;
+  }>) {
+    yield { source, key: r.key, rowid: r.rowid, value: r.value ?? null };
   }
 }
 
-/** Iterate all `composerData:*` rows (conversations). */
-export function* readComposers(db: Database.Database): Generator<ComposerRow> {
-  const stmt = db.prepare(
-    "SELECT key, value FROM cursorDiskKV WHERE key >= 'composerData:' AND key < 'composerData:~'",
-  );
-  for (const { key, value } of stmt.iterate() as IterableIterator<{ key: string; value: Buffer }>) {
-    const parts = key.split(":");
-    yield {
-      namespace: "composerData",
-      key,
-      composerId: parts[1] ?? "",
-      value: parseJsonValue(value),
-    };
-  }
-}
-
-/** Everything we currently sync, as a single stream. */
-export function* readSyncedRows(db: Database.Database): Generator<ChatRow> {
-  yield* readComposers(db);
-  yield* readBubbles(db);
+/** Stream every row of every source — a full snapshot of Cursor's state. */
+export function* readAllRows(db: Database.Database): Generator<KvRow> {
+  for (const source of SOURCES) yield* readSource(db, source);
 }

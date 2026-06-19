@@ -1,43 +1,34 @@
-/** Namespaces in Cursor's `cursorDiskKV` table that cursorsync understands. */
-export type Namespace = "bubbleId" | "composerData" | "agentKv";
+/**
+ * cursorsync syncs ALL of Cursor's state, not a curated subset. Cursor stores everything as
+ * key/value rows in two SQLite tables of its global `state.vscdb`:
+ *
+ *   - `cursorDiskKV` — bubbleId (messages), composerData (conversations), agentKv (agent traces,
+ *     often binary), checkpointId, ofsContent, inline diffs, etc.
+ *   - `ItemTable`    — workbench/UI state and assorted settings.
+ *
+ * We treat both generically. A row's value is raw bytes; values that aren't valid UTF-8 are
+ * flagged binary and base64-encoded downstream.
+ */
 
-/** Namespaces we sync today. `agentKv` is phase 2. */
-export const SYNCED_NAMESPACES: Namespace[] = ["bubbleId", "composerData"];
+/** Logical origin of a row: which DB + table it came from. */
+export type Source = "global:cursorDiskKV" | "global:ItemTable";
 
-/** Namespaces we deliberately never sync (regenerable / ephemeral / per-machine). */
-export const EXCLUDED_PREFIXES = [
-  "checkpointId",
-  "ofsContent",
-  "composer.content.",
-  "inlineDiff",
-  "composerVirtualRowHeights",
-  "bcCachedDetails",
-] as const;
+export const SOURCES: Source[] = ["global:cursorDiskKV", "global:ItemTable"];
 
-/** A single chat message. Key: `bubbleId:{composerId}:{messageId}`. */
-export interface BubbleRow {
-  namespace: "bubbleId";
-  key: string;
-  composerId: string;
-  messageId: string;
-  value: unknown; // parsed JSON
+/** Map a source to the SQLite table name it reads/writes. */
+export function tableForSource(source: Source): "cursorDiskKV" | "ItemTable" {
+  return source === "global:ItemTable" ? "ItemTable" : "cursorDiskKV";
 }
 
-/** A conversation. Key: `composerData:{composerId}`. */
-export interface ComposerRow {
-  namespace: "composerData";
+/**
+ * A raw key/value row from one of Cursor's tables.
+ *
+ * better-sqlite3 returns TEXT-affinity values as JS strings and BLOB-affinity values as Buffers,
+ * so `value` may be either (or null for tombstones). Downstream handles all three.
+ */
+export interface KvRow {
+  source: Source;
   key: string;
-  composerId: string;
-  value: unknown; // parsed JSON (contains richText with absolute paths)
+  rowid: number;
+  value: Buffer | string | null;
 }
-
-/** Content-addressed agent artifact. Key: `agentKv:blob:{sha256}`. Phase 2. */
-export interface AgentBlobRow {
-  namespace: "agentKv";
-  key: string;
-  sha256: string;
-  isBinary: boolean;
-  value: Buffer; // raw bytes (may be protobuf/gzip or JSON text)
-}
-
-export type ChatRow = BubbleRow | ComposerRow | AgentBlobRow;

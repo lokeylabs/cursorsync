@@ -1,18 +1,12 @@
 # PowerSync Sync Streams for cursorsync (edition 3 — deployed format).
-# Every authenticated device receives all of the user's chat rows. Conflict-free because the
-# client upserts by primary key (the Cursor key).
-#
-# Deployed to the live PowerSync `cursorsync` instance via the dashboard Sync Streams editor.
+# Each authenticated user syncs only their own rows (owner_id = their auth subject). This covers
+# EVERYTHING Cursor stores — every cursorDiskKV + ItemTable row flows through the single table.
 
 config:
   edition: 3
 
 streams:
   chats:
-    # auto_subscribe: every connected client syncs this stream by default.
     auto_subscribe: true
     queries:
-      - SELECT * FROM cursor_kv
-      - SELECT * FROM cursor_workspace_index
-      # Phase 2 (large; enable with the agentKv blob work):
-      # - SELECT * FROM cursor_blob
+      - SELECT * FROM cursor_kv WHERE owner_id = auth.user_id()

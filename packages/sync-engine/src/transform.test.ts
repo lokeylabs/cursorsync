@@ -1,34 +1,54 @@
 import { describe, it, expect } from "vitest";
-import { toKvRecord } from "./transform.js";
-import type { ChangedRow } from "@cursorsync/cursor-store";
+import { toKvRecord, fromKvRecord, rowId } from "./transform.js";
+import type { KvRow } from "@cursorsync/cursor-store";
 
-function row(key: string, value: unknown): ChangedRow {
-  return { key, rowid: 1, value: Buffer.from(JSON.stringify(value), "utf8") };
+const OWNER = "11111111-1111-1111-1111-111111111111";
+
+function row(
+  key: string,
+  value: Buffer | null,
+  source: KvRow["source"] = "global:cursorDiskKV",
+): KvRow {
+  return { source, key, rowid: 1, value };
 }
 
 describe("toKvRecord", () => {
-  it("parses a bubbleId message into composer + message ids", () => {
-    const rec = toKvRecord(row("bubbleId:comp-1:msg-9", { text: "hi" }));
-    expect(rec).toEqual({
-      key: "bubbleId:comp-1:msg-9",
-      namespace: "bubbleId",
-      composer_id: "comp-1",
-      message_id: "msg-9",
-      value: { text: "hi" },
-    });
-  });
-
-  it("parses a composerData conversation with a null message id", () => {
-    const rec = toKvRecord(row("composerData:comp-1", { title: "Chat" }));
+  it("stores UTF-8 (JSON) values as text", () => {
+    const rec = toKvRecord(row("composerData:c1", Buffer.from('{"t":"hi"}', "utf8")), OWNER, "mac");
     expect(rec).toMatchObject({
-      namespace: "composerData",
-      composer_id: "comp-1",
-      message_id: null,
+      id: rowId(OWNER, "global:cursorDiskKV", "composerData:c1"),
+      source: "global:cursorDiskKV",
+      ckey: "composerData:c1",
+      is_binary: false,
+      value: '{"t":"hi"}',
+      device_id: "mac",
     });
   });
 
-  it("ignores namespaces outside the synced set", () => {
-    expect(toKvRecord(row("checkpointId:abc", {}))).toBeNull();
-    expect(toKvRecord(row("agentKv:blob:deadbeef", {}))).toBeNull();
+  it("base64-encodes non-UTF-8 (binary) values", () => {
+    const bin = Buffer.from([0xff, 0x00, 0xfe, 0x01]);
+    const rec = toKvRecord(row("agentKv:blob:abc", bin), OWNER, "mac");
+    expect(rec.is_binary).toBe(true);
+    expect(rec.value).toBe(bin.toString("base64"));
+  });
+
+  it("handles null (tombstone) values", () => {
+    expect(toKvRecord(row("composerData:x", null), OWNER, "mac")).toMatchObject({
+      is_binary: false,
+      value: null,
+    });
+  });
+
+  it("round-trips text and binary back to identical bytes", () => {
+    for (const buf of [Buffer.from('{"a":1}', "utf8"), Buffer.from([0xde, 0xad, 0xbe, 0xef])]) {
+      const rec = toKvRecord(row("k", buf), OWNER, "mac");
+      expect(fromKvRecord(rec).value.equals(buf)).toBe(true);
+    }
+  });
+
+  it("routes ItemTable rows to the ItemTable source", () => {
+    const rec = toKvRecord(row("ui.state", Buffer.from("x"), "global:ItemTable"), OWNER, "mac");
+    expect(rec.source).toBe("global:ItemTable");
+    expect(fromKvRecord(rec).source).toBe("global:ItemTable");
   });
 });

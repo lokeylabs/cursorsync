@@ -2,9 +2,12 @@ import Database from "better-sqlite3";
 import { copyFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { defaultGlobalDbPath } from "./cursor-db.js";
+import { tableForSource, type Source } from "./types.js";
 
-/** A row to write back into Cursor's `cursorDiskKV` table. */
+/** A row to write back into one of Cursor's tables. */
 export interface WriteRow {
+  /** Which table to write. Defaults to global:cursorDiskKV when omitted. */
+  source?: Source;
   key: string;
   /** Raw value bytes. Strings are encoded as UTF-8 (JSON namespaces are stored as text). */
   value: Buffer | string;
@@ -66,12 +69,17 @@ export function applyRows(
   const db = new Database(dbPath);
   try {
     db.pragma("busy_timeout = 5000");
-    const stmt = db.prepare("INSERT INTO cursorDiskKV (key, value) VALUES (?, ?)");
+    // One prepared INSERT per table; ON CONFLICT REPLACE is baked into the schema.
+    const stmts: Partial<Record<string, Database.Statement>> = {};
+    const stmtFor = (source: Source) => {
+      const table = tableForSource(source);
+      return (stmts[table] ??= db.prepare(`INSERT INTO "${table}" (key, value) VALUES (?, ?)`));
+    };
     const tx = db.transaction((items: WriteRow[]) => {
       let n = 0;
       for (const r of items) {
         const value = typeof r.value === "string" ? Buffer.from(r.value, "utf8") : r.value;
-        stmt.run(r.key, value);
+        stmtFor(r.source ?? "global:cursorDiskKV").run(r.key, value);
         n++;
       }
       return n;
