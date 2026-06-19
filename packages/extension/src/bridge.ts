@@ -16,11 +16,17 @@ import {
   emptyState,
   type DetectorState,
   type WriteRow,
+  type Source,
 } from "@cursorsync/cursor-store";
+import { isUtf8 } from "node:buffer";
 import {
   toKvRecord,
   fromKvRecord,
+  blobRecord,
+  writeRowOf,
   shouldSyncRow,
+  shouldOffload,
+  sha256Hex,
   type KvRecord,
   type SyncPolicy,
 } from "@cursorsync/sync-engine";
@@ -35,6 +41,8 @@ const BACKUP_KEEP = 2;
 const UP_BATCH = 400;
 // Cap the down-sync undo journal so safety never costs unbounded disk.
 const UNDO_CAP_BYTES = 64 * 1024 * 1024;
+// Download at most this many offloaded blobs into memory at once during down-sync.
+const DOWN_BLOB_CHUNK = 32;
 
 export interface UpResult {
   pushed: number;
@@ -115,6 +123,27 @@ export class SyncBridge {
   }
 
   /**
+   * Encode one local row for up-sync. Large or binary values are uploaded to object storage
+   * (content-addressed, deduped) and represented by a pointer record; everything else inlines.
+   * One blob is held in memory at a time.
+   */
+  private async encodeForUp(
+    source: Source,
+    key: string,
+    raw: Buffer | string | null,
+    ownerId: string,
+    repo: string | null,
+  ): Promise<KvRecord> {
+    const bytes = raw === null ? null : typeof raw === "string" ? Buffer.from(raw, "utf8") : raw;
+    if (bytes !== null && shouldOffload(key, bytes.length)) {
+      const sha = sha256Hex(bytes);
+      await this.transport.uploadBlob(ownerId, sha, bytes);
+      return blobRecord({ source, key }, ownerId, this.deviceId, repo, sha, !isUtf8(bytes));
+    }
+    return toKvRecord({ source, key, rowid: 0, value: raw }, ownerId, this.deviceId, repo);
+  }
+
+  /**
    * Push changed local rows to the cloud, STREAMING in small batches so memory stays bounded even
    * for a 27 GB database. The per-source rowid watermark is persisted after each pushed batch, so a
    * large first sync is resumable and later syncs only push new rows. `maxRows` caps a single run
@@ -157,14 +186,7 @@ export class SyncBridge {
             if (!shouldSyncRow(source, r.key, policy)) continue; // namespace include/exclude
             const repo = repoForKey(r.key, composerRepo);
             if (scope === "repo" && repo !== currentRepo) continue; // isolate to this repo
-            records.push(
-              toKvRecord(
-                { source, key: r.key, rowid: r.rowid, value: r.value ?? null },
-                ownerId,
-                this.deviceId,
-                repo,
-              ),
-            );
+            records.push(await this.encodeForUp(source, r.key, r.value ?? null, ownerId, repo));
           }
           if (records.length) pushed += await this.transport.push(records);
 
@@ -185,21 +207,40 @@ export class SyncBridge {
     await this.setWatermark(emptyState());
   }
 
-  /**
-   * Write decoded records into the live Cursor DB in one atomic transaction. Safety is the
-   * lightweight undo journal — prior values of any overwritten-and-changed keys are recorded — not a
-   * 27 GB copy. (Down-sync is additive and the cloud is canonical, so only genuine over-writes need
-   * protecting.)
-   */
-  async applyRecords(
-    records: Array<Pick<KvRecord, "source" | "ckey" | "is_binary" | "value">>,
-  ): Promise<number> {
-    const rows: WriteRow[] = records.map(fromKvRecord);
+  /** Write WriteRows into the live Cursor DB atomically, journaling any over-writes for undo. */
+  private writeRows(rows: WriteRow[]): number {
+    if (rows.length === 0) return 0;
     const { written, undo } = applyRows(defaultGlobalDbPath(), rows, {
       allowLiveGlobalDb: true,
       captureUndo: true,
     });
     appendUndoJournal(defaultUndoJournalPath(), undo, UNDO_CAP_BYTES);
+    return written;
+  }
+
+  /**
+   * Apply records to the live Cursor DB. Inline records write in one transaction; offloaded records
+   * (blob_sha set) download their bytes in bounded chunks so memory stays flat regardless of blob
+   * size. Safety is the lightweight undo journal — never a full-DB copy.
+   */
+  async applyRecords(
+    records: Array<
+      Pick<KvRecord, "source" | "ckey" | "is_binary" | "value" | "blob_sha" | "owner_id">
+    >,
+  ): Promise<number> {
+    let written = this.writeRows(records.filter((r) => r.blob_sha === null).map(fromKvRecord));
+
+    const offloaded = records.filter((r) => r.blob_sha !== null);
+    for (let i = 0; i < offloaded.length; i += DOWN_BLOB_CHUNK) {
+      const chunk = offloaded.slice(i, i + DOWN_BLOB_CHUNK);
+      const rows: WriteRow[] = [];
+      for (const rec of chunk) {
+        if (rec.blob_sha === null) continue; // narrowed; defensive
+        const bytes = await this.transport.downloadBlob(rec.owner_id, rec.blob_sha);
+        rows.push(writeRowOf(rec, bytes));
+      }
+      written += this.writeRows(rows);
+    }
     return written;
   }
 

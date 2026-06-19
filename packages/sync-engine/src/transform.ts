@@ -11,7 +11,10 @@ export interface KvRecord {
   source: Source;
   ckey: string;
   is_binary: boolean;
+  /** Inline value (text or base64). Null when the bytes are offloaded — see `blob_sha`. */
   value: string | null;
+  /** sha256 of the value when it lives in object storage instead of inline; null otherwise. */
+  blob_sha: string | null;
   /** Stable repo id (git remote) this row belongs to, or null for non-conversation rows. */
   repo: string | null;
   device_id: string;
@@ -51,12 +54,38 @@ export function toKvRecord(
     ckey: row.key,
     is_binary: isBinary,
     value,
+    blob_sha: null,
     repo,
     device_id: deviceId,
   };
 }
 
-/** Decode a synced record back into raw bytes for writing into Cursor's DB. */
+/** Build a record whose bytes live in object storage (value offloaded, pointer = `sha`). */
+export function blobRecord(
+  meta: { source: Source; key: string },
+  ownerId: string,
+  deviceId: string,
+  repo: string | null,
+  sha: string,
+  isBinary: boolean,
+): KvRecord {
+  return {
+    id: rowId(ownerId, meta.source, meta.key),
+    owner_id: ownerId,
+    source: meta.source,
+    ckey: meta.key,
+    is_binary: isBinary,
+    value: null,
+    blob_sha: sha,
+    repo,
+    device_id: deviceId,
+  };
+}
+
+/**
+ * Decode an INLINE record back into raw bytes for writing into Cursor's DB. Records whose bytes are
+ * offloaded (`blob_sha` set) must have their bytes fetched separately and written via `writeRowOf`.
+ */
 export function fromKvRecord(rec: Pick<KvRecord, "source" | "ckey" | "is_binary" | "value">): {
   source: Source;
   key: string;
@@ -67,4 +96,12 @@ export function fromKvRecord(rec: Pick<KvRecord, "source" | "ckey" | "is_binary"
       ? Buffer.alloc(0)
       : Buffer.from(rec.value, rec.is_binary ? "base64" : "utf8");
   return { source: rec.source, key: rec.ckey, value };
+}
+
+/** Construct a write row from a record plus already-fetched blob bytes. */
+export function writeRowOf(
+  rec: Pick<KvRecord, "source" | "ckey">,
+  bytes: Buffer,
+): { source: Source; key: string; value: Buffer } {
+  return { source: rec.source, key: rec.ckey, value: bytes };
 }

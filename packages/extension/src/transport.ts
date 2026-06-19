@@ -1,11 +1,40 @@
 import type { SupabaseClient, RealtimeChannel } from "@supabase/supabase-js";
 import type { KvRecord } from "@cursorsync/sync-engine";
 
+const BLOB_BUCKET = "cursor-blobs";
+const SELECT_COLS = "id,owner_id,source,ckey,is_binary,value,blob_sha,repo,device_id";
+
+function errMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+/** Transient = worth retrying (network blips, throttling, 5xx). Auth/RLS/validation are not. */
+function isTransient(err: unknown): boolean {
+  const m = errMessage(err).toLowerCase();
+  return /fetch failed|network|econnreset|etimedout|socket|timeout|429|rate limit|5\d\d/.test(m);
+}
+
+const delay = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+async function withRetry<T>(op: () => Promise<T>, label: string, attempts = 3): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await op();
+    } catch (err) {
+      lastErr = err;
+      if (!isTransient(err) || i === attempts - 1) break;
+      await delay(250 * 2 ** i);
+    }
+  }
+  throw new Error(`${label} failed: ${errMessage(lastErr)}`);
+}
+
 /**
- * Sync transport over the shared Supabase hub. Push is a PostgREST upsert keyed on `id` (the
- * deterministic `${owner}:${source}:${key}`), giving conflict-free union merge. Pull is an initial
- * paginated select plus a Realtime subscription for live changes. RLS confines everything to the
- * signed-in user. (PowerSync replicates the same table for offline-first / native clients.)
+ * Sync transport over the shared Supabase hub. Row metadata + small/inline values go to the
+ * `cursor_kv` Postgres table (upsert by deterministic `id` = conflict-free union merge). Large or
+ * binary values are content-addressed in the `cursor-blobs` Storage bucket, keyed `{owner}/{sha}`.
+ * Every network call retries transient failures with backoff; RLS confines everything to the user.
  */
 export class Transport {
   constructor(private client: SupabaseClient) {}
@@ -15,38 +44,65 @@ export class Transport {
     let written = 0;
     for (let i = 0; i < records.length; i += batchSize) {
       const batch = records.slice(i, i + batchSize);
-      const { error } = await this.client
-        .from("cursor_kv")
-        .upsert(batch, { onConflict: "id", ignoreDuplicates: false });
-      if (error) throw new Error(`push failed: ${error.message}`);
+      await withRetry(async () => {
+        const { error } = await this.client
+          .from("cursor_kv")
+          .upsert(batch, { onConflict: "id", ignoreDuplicates: false });
+        if (error) throw new Error(error.message);
+      }, "push");
       written += batch.length;
     }
     return written;
   }
 
-  /** Fetch all rows for the user, optionally filtered to one repo, paginated. */
+  /** Upload a value's bytes to the blob bucket (content-addressed; idempotent — deduped by sha). */
+  async uploadBlob(ownerId: string, sha: string, bytes: Buffer): Promise<void> {
+    await withRetry(async () => {
+      const { error } = await this.client.storage
+        .from(BLOB_BUCKET)
+        .upload(`${ownerId}/${sha}`, bytes, {
+          upsert: false,
+          contentType: "application/octet-stream",
+        });
+      if (error && !/exists|duplicate/i.test(error.message)) throw new Error(error.message);
+    }, "uploadBlob");
+  }
+
+  /** Download an offloaded value's bytes from the blob bucket. */
+  async downloadBlob(ownerId: string, sha: string): Promise<Buffer> {
+    return withRetry(async () => {
+      const { data, error } = await this.client.storage
+        .from(BLOB_BUCKET)
+        .download(`${ownerId}/${sha}`);
+      if (error || !data) throw new Error(error?.message ?? "blob not found");
+      return Buffer.from(await data.arrayBuffer());
+    }, "downloadBlob");
+  }
+
+  /** Yield the user's rows (optionally one repo) one keyset page at a time — memory stays bounded. */
   async *pullPages(repo?: string | null, pageSize = 1000): AsyncGenerator<KvRecord[]> {
-    // Keyset pagination by id (stable under concurrent writes); yields one page at a time so the
-    // caller applies + discards each page — memory stays bounded for arbitrarily large datasets.
     let lastId: string | null = null;
     for (;;) {
-      let q = this.client
-        .from("cursor_kv")
-        .select("id,owner_id,source,ckey,is_binary,value,repo,device_id")
-        .order("id", { ascending: true })
-        .limit(pageSize);
-      if (lastId !== null) q = q.gt("id", lastId);
-      if (repo) q = q.eq("repo", repo);
-      const { data, error } = await q;
-      if (error) throw new Error(`pull failed: ${error.message}`);
-      if (!data || data.length === 0) return;
-      yield data as KvRecord[];
-      lastId = (data[data.length - 1] as KvRecord).id;
-      if (data.length < pageSize) return;
+      const page = await withRetry(async () => {
+        let q = this.client
+          .from("cursor_kv")
+          .select(SELECT_COLS)
+          .order("id", { ascending: true })
+          .limit(pageSize);
+        if (lastId !== null) q = q.gt("id", lastId);
+        if (repo) q = q.eq("repo", repo);
+        const { data, error } = await q;
+        if (error) throw new Error(error.message);
+        return (data ?? []) as KvRecord[];
+      }, "pull");
+      if (page.length === 0) return;
+      yield page;
+      lastId = page[page.length - 1]!.id;
+      if (page.length < pageSize) return;
     }
   }
 
-  /** Subscribe to live row changes for this user. Returns the channel (call .unsubscribe()). */
+  /** Subscribe to live row changes for this user. Returns the channel (call `.unsubscribe()`). */
   subscribe(ownerId: string, onRecord: (rec: KvRecord) => void): RealtimeChannel {
     return this.client
       .channel("cursor_kv_changes")

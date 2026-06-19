@@ -14,7 +14,8 @@ create table if not exists cursor_kv (
   source     text not null,               -- 'global:cursorDiskKV' | 'global:ItemTable'
   ckey       text not null,               -- the raw Cursor key
   is_binary  boolean not null default false,
-  value      text,                        -- UTF-8 text (usually JSON) or base64 when is_binary
+  value      text,                        -- inline value (text/base64); null when offloaded to storage
+  blob_sha   text,                        -- sha256 pointer into the `cursor-blobs` bucket; null when inline
   repo       text,                        -- stable repo id (git remote) for conversation rows; null otherwise
   device_id  text,
   updated_at timestamptz not null default now()
@@ -30,3 +31,12 @@ alter table cursor_kv enable row level security;
 drop policy if exists "own rows" on cursor_kv;
 create policy "own rows" on cursor_kv
   for all using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+
+-- Large/binary values are content-addressed in the private `cursor-blobs` Storage bucket at
+-- path `{owner_id}/{sha256}`. Each user may read/write only their own folder.
+drop policy if exists "own blobs read" on storage.objects;
+drop policy if exists "own blobs insert" on storage.objects;
+create policy "own blobs read" on storage.objects for select to authenticated
+  using (bucket_id = 'cursor-blobs' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "own blobs insert" on storage.objects for insert to authenticated
+  with check (bucket_id = 'cursor-blobs' and (storage.foldername(name))[1] = auth.uid()::text);
