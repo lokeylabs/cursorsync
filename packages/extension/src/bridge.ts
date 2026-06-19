@@ -15,7 +15,13 @@ import {
   type DetectorState,
   type WriteRow,
 } from "@cursorsync/cursor-store";
-import { toKvRecord, fromKvRecord, type KvRecord } from "@cursorsync/sync-engine";
+import {
+  toKvRecord,
+  fromKvRecord,
+  shouldSyncRow,
+  type KvRecord,
+  type SyncPolicy,
+} from "@cursorsync/sync-engine";
 import type { Transport } from "./transport.js";
 import type { SyncScope } from "./config.js";
 
@@ -100,6 +106,7 @@ export class SyncBridge {
     ownerId: string,
     scope: SyncScope,
     currentRepo: string | null,
+    policy: SyncPolicy,
     maxRows = Infinity,
   ): Promise<UpResult> {
     const db = openReadonly();
@@ -128,6 +135,7 @@ export class SyncBridge {
           for (const r of rows) {
             since = r.rowid;
             scanned++;
+            if (!shouldSyncRow(source, r.key, policy)) continue; // namespace include/exclude
             const repo = repoForKey(r.key, composerRepo);
             if (scope === "repo" && repo !== currentRepo) continue; // isolate to this repo
             records.push(

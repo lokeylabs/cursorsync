@@ -82,6 +82,7 @@ export function activate(ctx: vscode.ExtensionContext) {
         user.id,
         cfg.syncScope,
         repo,
+        cfg.policy,
         opts?.background ? BG_CAP : Infinity,
       );
       stats.pushed += r.pushed;

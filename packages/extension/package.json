@@ -2,7 +2,7 @@
   "name": "cursorsync",
   "displayName": "cursorsync",
   "description": "Sync your Cursor chat history across all your devices.",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "license": "MIT",
   "publisher": "lokeylabs",
   "repository": {
@@ -94,6 +94,21 @@
           ],
           "default": "all",
           "description": "Whether to sync all chats or isolate sync to the current repository. Toggleable from the cursorsync panel."
+        },
+        "cursorsync.syncAgentArtifacts": {
+          "type": "boolean",
+          "default": false,
+          "description": "Also sync agent tool-result traces (agentKv) — large and often binary. Off by default; conversations always sync."
+        },
+        "cursorsync.syncFileSnapshots": {
+          "type": "boolean",
+          "default": false,
+          "description": "Also sync file/checkpoint snapshots (checkpointId, ofsContent) — regenerable. Off by default."
+        },
+        "cursorsync.syncUiState": {
+          "type": "boolean",
+          "default": false,
+          "description": "Also sync per-machine UI/editor state (ItemTable, diffs). Off by default; mirroring this across devices is usually undesirable."
         }
       }
     }
