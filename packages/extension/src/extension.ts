@@ -28,7 +28,7 @@ export function activate(context: vscode.ExtensionContext) {
     }),
     vscode.commands.registerCommand("cursorsync.signIn", async () => {
       vscode.window.showInformationMessage("cursorsync: Supabase auth not yet implemented.");
-    })
+    }),
   );
 }
 

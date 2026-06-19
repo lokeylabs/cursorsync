@@ -5,22 +5,49 @@
   "version": "0.0.1",
   "license": "MIT",
   "publisher": "alexhughes",
-  "engines": { "vscode": "^1.90.0" },
-  "categories": ["Other"],
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
   "main": "./dist/extension.js",
-  "activationEvents": ["onStartupFinished"],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "contributes": {
     "commands": [
-      { "command": "cursorsync.status", "title": "cursorsync: Show Sync Status" },
-      { "command": "cursorsync.syncNow", "title": "cursorsync: Sync Now" },
-      { "command": "cursorsync.signIn", "title": "cursorsync: Sign In to Supabase" }
+      {
+        "command": "cursorsync.status",
+        "title": "cursorsync: Show Sync Status"
+      },
+      {
+        "command": "cursorsync.syncNow",
+        "title": "cursorsync: Sync Now"
+      },
+      {
+        "command": "cursorsync.signIn",
+        "title": "cursorsync: Sign In to Supabase"
+      }
     ],
     "configuration": {
       "title": "cursorsync",
       "properties": {
-        "cursorsync.supabaseUrl": { "type": "string", "default": "", "description": "Supabase project URL" },
-        "cursorsync.powersyncUrl": { "type": "string", "default": "", "description": "PowerSync instance URL" },
-        "cursorsync.syncAgentBlobs": { "type": "boolean", "default": false, "description": "Phase 2: also sync agentKv blobs (~12 GB)" }
+        "cursorsync.supabaseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Supabase project URL"
+        },
+        "cursorsync.powersyncUrl": {
+          "type": "string",
+          "default": "",
+          "description": "PowerSync instance URL"
+        },
+        "cursorsync.syncAgentBlobs": {
+          "type": "boolean",
+          "default": false,
+          "description": "Phase 2: also sync agentKv blobs (~12 GB)"
+        }
       }
     }
   },
@@ -29,15 +56,11 @@
     "package": "vsce package"
   },
   "dependencies": {
-    "@cursorsync/core": "*",
-    "@powersync/node": "^0.4.0",
-    "@supabase/supabase-js": "^2.45.0",
-    "better-sqlite3": "^11.10.0"
+    "@cursorsync/cursor-store": "workspace:*",
+    "@cursorsync/sync-engine": "workspace:*"
   },
   "devDependencies": {
     "@types/vscode": "^1.90.0",
-    "@types/node": "^22.0.0",
-    "typescript": "^5.5.0",
     "@vscode/vsce": "^3.0.0"
   }
 }

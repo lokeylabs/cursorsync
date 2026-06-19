@@ -26,9 +26,7 @@ export function ensureEnvLoaded(): void {
 function required(name: string): string {
   const v = process.env[name];
   if (!v || v.startsWith("YOUR-") || v.startsWith("your-")) {
-    throw new Error(
-      `Missing required env var ${name}. Copy .env.example to .env and fill it in.`
-    );
+    throw new Error(`Missing required env var ${name}. Copy .env.example to .env and fill it in.`);
   }
   return v;
 }

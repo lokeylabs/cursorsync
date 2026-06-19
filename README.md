@@ -21,7 +21,7 @@ stream chat changes, so no extension can sync it "natively."
 cursorsync sidesteps both problems:
 
 - **Row-level union merge, not file merge.** Each chat message is a row with a globally-unique
-  key (`bubbleId:{composerId}:{messageId}`). We sync *rows*, upserting by key. Distinct keys
+  key (`bubbleId:{composerId}:{messageId}`). We sync _rows_, upserting by key. Distinct keys
   never collide → lossless union even when two machines write at once.
 - **PowerSync owns the distributed-systems problem.** Offline, reconnect, conflict-free
   convergence, and "machines need not be online simultaneously" all come from PowerSync's bucket
@@ -37,21 +37,51 @@ Cursor state.vscdb  <->  [cursorsync bridge]  <->  PowerSync local SQLite
 
 ## What we sync (measured on a real 27 GB Cursor DB)
 
-| Namespace      | Rows  | Size    | Synced | Notes |
-|----------------|-------|---------|--------|-------|
-| `bubbleId`     | 802k  | 10.8 GB | ✅      | individual chat messages, keyed by `{composerId}:{messageId}` |
-| `composerData` | 2.3k  | 162 MB  | ✅      | conversation objects (title, ordering, file mentions) |
-| `agentKv:blob` | 721k  | 11.9 GB | ⏳ phase 2 | content-addressed agent tool-results & traces (JSON + binary, immutable) |
-| `checkpointId` | 7k    | 1.9 GB  | ❌      | file-tree snapshots — regenerable, excluded |
-| `ofsContent`   | 6.5k  | 114 MB  | ❌      | file content snapshots — excluded |
-| diff / UI state| —     | small   | ❌      | per-machine ephemeral state |
+| Namespace       | Rows | Size    | Synced     | Notes                                                                    |
+| --------------- | ---- | ------- | ---------- | ------------------------------------------------------------------------ |
+| `bubbleId`      | 802k | 10.8 GB | ✅         | individual chat messages, keyed by `{composerId}:{messageId}`            |
+| `composerData`  | 2.3k | 162 MB  | ✅         | conversation objects (title, ordering, file mentions)                    |
+| `agentKv:blob`  | 721k | 11.9 GB | ⏳ phase 2 | content-addressed agent tool-results & traces (JSON + binary, immutable) |
+| `checkpointId`  | 7k   | 1.9 GB  | ❌         | file-tree snapshots — regenerable, excluded                              |
+| `ofsContent`    | 6.5k | 114 MB  | ❌         | file content snapshots — excluded                                        |
+| diff / UI state | —    | small   | ❌         | per-machine ephemeral state                                              |
 
 The 27 GB on disk is mostly checkpoint/snapshot bloat. The actual conversations are ~11 GB.
+
+## Repository layout
+
+A pnpm workspace monorepo with strict separation of concerns:
+
+```
+packages/
+  cursor-store/   Pure adapter for Cursor's state.vscdb — read/write + delta detection. No app deps.
+  sync-engine/    Transform, config, and PowerSync/Supabase transport (orchestration).
+  extension/      The Cursor / VS Code extension that hosts the bridge loop.
+examples/         Runnable read-only probes/demos against a local Cursor DB.
+supabase/         Postgres schema + PowerSync sync rules.
+docs/             Architecture and design notes.
+```
+
+`cursor-store` is the only package allowed to touch SQLite and stays free of app/transport
+dependencies; everything network- or config-related lives in `sync-engine`. See
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Development
+
+```bash
+pnpm install
+pnpm build && pnpm lint && pnpm typecheck && pnpm test
+pnpm probe          # read-only footprint of your own Cursor DB
+```
+
+Requires Node ≥ 20 ([`.nvmrc`](.nvmrc)) and pnpm ≥ 9.
 
 ## Roadmap
 
 - [x] Read-only schema probe + extractor (validated)
-- [ ] Supabase schema + PowerSync sync rules
+- [x] Up-sync delta detection (rowid watermark + composerData hash compare)
+- [x] pnpm workspace, CI, lint/format, package separation
+- [ ] Supabase schema + PowerSync sync rules applied to a live instance
 - [ ] Bridge: up-sync (Cursor SQLite -> PowerSync)
 - [ ] Bridge: down-sync (PowerSync -> Cursor SQLite) with safe writes + backups
 - [ ] Per-machine path rewriting (file mentions use absolute paths)

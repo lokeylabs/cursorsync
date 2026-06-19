@@ -1,0 +1,18 @@
+{
+  "name": "@cursorsync/examples",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Runnable examples / read-only probes against a local Cursor DB",
+  "scripts": {
+    "probe": "tsx probe.ts",
+    "demo:delta": "tsx demo-delta.ts"
+  },
+  "dependencies": {
+    "@cursorsync/cursor-store": "workspace:*",
+    "@cursorsync/sync-engine": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "@cursorsync/sync-engine",
+  "version": "0.0.1",
+  "description": "Change-detection transform, config, and PowerSync/Supabase transport for cursorsync",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@cursorsync/cursor-store": "workspace:*",
+    "dotenv": "^16.4.5"
+  }
+}

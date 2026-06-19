@@ -1,4 +1,4 @@
-import type { ChangedRow } from "./change-detector.js";
+import type { ChangedRow } from "@cursorsync/cursor-store";
 
 /** A row shaped for the `cursor_kv` Supabase table / PowerSync local SQLite. */
 export interface KvRecord {

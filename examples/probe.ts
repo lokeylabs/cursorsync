@@ -2,9 +2,9 @@
  * Read-only footprint probe. Prints row counts and byte sizes per namespace.
  * Reproduces the manual measurement used to design the sync schema.
  *
- *   node --loader ts-node/esm src/probe.ts [path-to-state.vscdb]
+ *   pnpm --filter @cursorsync/examples probe [path-to-state.vscdb]
  */
-import { openReadonly, defaultGlobalDbPath } from "./cursor-db.js";
+import { openReadonly, defaultGlobalDbPath } from "@cursorsync/cursor-store";
 
 const dbPath = process.argv[2] ?? defaultGlobalDbPath();
 const db = openReadonly(dbPath);
@@ -15,7 +15,7 @@ for (const p of prefixes) {
   const row = db
     .prepare(
       `SELECT count(*) AS rows, COALESCE(sum(length(value)),0) AS bytes
-       FROM cursorDiskKV WHERE key >= ? AND key < ?`
+       FROM cursorDiskKV WHERE key >= ? AND key < ?`,
     )
     .get(`${p}:`, `${p}:~`) as { rows: number; bytes: number };
   const mb = (row.bytes / 1048576).toFixed(1);

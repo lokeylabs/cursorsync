@@ -42,7 +42,7 @@ function sha256(buf: Buffer): string {
  */
 export function detectChanges(
   db: Database.Database,
-  state: DetectorState
+  state: DetectorState,
 ): { changed: ChangedRow[]; next: DetectorState } {
   const changed: ChangedRow[] = [];
 
@@ -54,7 +54,7 @@ export function detectChanges(
          AND value IS NOT NULL
          AND ( (key >= 'bubbleId:' AND key < 'bubbleId:~')
             OR (key >= 'composerData:' AND key < 'composerData:~') )
-       ORDER BY rowid ASC`
+       ORDER BY rowid ASC`,
     )
     .all(state.maxRowid) as Array<{ rowid: number; key: string; value: Buffer }>;
 
@@ -71,7 +71,7 @@ export function detectChanges(
   const composers = db
     .prepare(
       `SELECT rowid AS rowid, key, value FROM cursorDiskKV
-       WHERE key >= 'composerData:' AND key < 'composerData:~' AND value IS NOT NULL`
+       WHERE key >= 'composerData:' AND key < 'composerData:~' AND value IS NOT NULL`,
     )
     .all() as Array<{ rowid: number; key: string; value: Buffer }>;
 

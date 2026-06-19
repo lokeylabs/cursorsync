@@ -13,9 +13,23 @@ export function defaultGlobalDbPath(): string {
   const home = homedir();
   switch (platform()) {
     case "darwin":
-      return join(home, "Library", "Application Support", "Cursor", "User", "globalStorage", "state.vscdb");
+      return join(
+        home,
+        "Library",
+        "Application Support",
+        "Cursor",
+        "User",
+        "globalStorage",
+        "state.vscdb",
+      );
     case "win32":
-      return join(process.env.APPDATA ?? join(home, "AppData", "Roaming"), "Cursor", "User", "globalStorage", "state.vscdb");
+      return join(
+        process.env.APPDATA ?? join(home, "AppData", "Roaming"),
+        "Cursor",
+        "User",
+        "globalStorage",
+        "state.vscdb",
+      );
     default:
       return join(home, ".config", "Cursor", "User", "globalStorage", "state.vscdb");
   }
@@ -37,7 +51,10 @@ export function openReadonly(dbPath = defaultGlobalDbPath()): Database.Database 
  * Take a consistent point-in-time copy via SQLite's online backup, then open the copy.
  * Use this for heavy full-table extraction during active writes. Caller deletes the temp dir.
  */
-export function snapshotAndOpen(dbPath = defaultGlobalDbPath()): { db: Database.Database; copyPath: string } {
+export function snapshotAndOpen(dbPath = defaultGlobalDbPath()): {
+  db: Database.Database;
+  copyPath: string;
+} {
   const dir = mkdtempSync(join(tmpdir(), "cursorsync-"));
   const copyPath = join(dir, "state.snapshot.vscdb");
   // better-sqlite3's backup is async; for a simple, dependency-light copy we lean on the OS copy
@@ -54,22 +71,33 @@ function parseJsonValue(raw: Buffer | string): unknown {
 /** Iterate all `bubbleId:*` rows (chat messages). */
 export function* readBubbles(db: Database.Database): Generator<BubbleRow> {
   const stmt = db.prepare(
-    "SELECT key, value FROM cursorDiskKV WHERE key >= 'bubbleId:' AND key < 'bubbleId:~'"
+    "SELECT key, value FROM cursorDiskKV WHERE key >= 'bubbleId:' AND key < 'bubbleId:~'",
   );
   for (const { key, value } of stmt.iterate() as IterableIterator<{ key: string; value: Buffer }>) {
-    const [, composerId, messageId] = key.split(":");
-    yield { namespace: "bubbleId", key, composerId, messageId, value: parseJsonValue(value) };
+    const parts = key.split(":");
+    yield {
+      namespace: "bubbleId",
+      key,
+      composerId: parts[1] ?? "",
+      messageId: parts[2] ?? "",
+      value: parseJsonValue(value),
+    };
   }
 }
 
 /** Iterate all `composerData:*` rows (conversations). */
 export function* readComposers(db: Database.Database): Generator<ComposerRow> {
   const stmt = db.prepare(
-    "SELECT key, value FROM cursorDiskKV WHERE key >= 'composerData:' AND key < 'composerData:~'"
+    "SELECT key, value FROM cursorDiskKV WHERE key >= 'composerData:' AND key < 'composerData:~'",
   );
   for (const { key, value } of stmt.iterate() as IterableIterator<{ key: string; value: Buffer }>) {
-    const [, composerId] = key.split(":");
-    yield { namespace: "composerData", key, composerId, value: parseJsonValue(value) };
+    const parts = key.split(":");
+    yield {
+      namespace: "composerData",
+      key,
+      composerId: parts[1] ?? "",
+      value: parseJsonValue(value),
+    };
   }
 }
 

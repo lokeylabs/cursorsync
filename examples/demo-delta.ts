@@ -3,17 +3,21 @@
  * Simulates a watermark just below the current max rowid, then shows detectChanges()
  * returns only the recent delta (not all 800k rows).
  *
- *   npx tsx src/demo-delta.ts
+ *   pnpm --filter @cursorsync/examples demo:delta
  */
-import { openReadonly, defaultGlobalDbPath } from "./cursor-db.js";
-import { detectChanges, type DetectorState } from "./change-detector.js";
-import { toKvRecord } from "./transform.js";
+import {
+  openReadonly,
+  defaultGlobalDbPath,
+  detectChanges,
+  type DetectorState,
+} from "@cursorsync/cursor-store";
+import { toKvRecord } from "@cursorsync/sync-engine";
 
 const db = openReadonly(process.argv[2] ?? defaultGlobalDbPath());
 
-const { maxRowid } = db
-  .prepare("SELECT MAX(rowid) AS maxRowid FROM cursorDiskKV")
-  .get() as { maxRowid: number };
+const { maxRowid } = db.prepare("SELECT MAX(rowid) AS maxRowid FROM cursorDiskKV").get() as {
+  maxRowid: number;
+};
 
 // Pretend we've synced everything except roughly the last 200 rowids.
 const state: DetectorState = { maxRowid: Math.max(0, maxRowid - 200), composerHashes: {} };
@@ -31,7 +35,9 @@ const byNs = records.reduce<Record<string, number>>((a, r) => {
 
 console.log(`detectChanges() found ${changed.length} changed rows in ${ms} ms`);
 console.log(`transformed -> ${records.length} records by namespace:`, byNs);
-console.log(`new watermark: maxRowid=${next.maxRowid}, composerHashes tracked=${Object.keys(next.composerHashes).length}`);
+console.log(
+  `new watermark: maxRowid=${next.maxRowid}, composerHashes tracked=${Object.keys(next.composerHashes).length}`,
+);
 console.log(`\nsample keys:`);
 for (const c of changed.slice(0, 5)) console.log("  " + c.key);
 db.close();

@@ -1,0 +1,45 @@
+{
+  "name": "cursorsync-monorepo",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Real-time, local-first sync of Cursor AI chat history across devices (PowerSync + Supabase)",
+  "license": "MIT",
+  "type": "module",
+  "homepage": "https://github.com/hughesyadaddy/cursorsync",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hughesyadaddy/cursorsync.git"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@10.26.2",
+  "scripts": {
+    "build": "pnpm -r --filter \"./packages/*\" build",
+    "clean": "pnpm -r clean",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "pnpm -r exec tsc --noEmit",
+    "test": "vitest run",
+    "probe": "pnpm --filter @cursorsync/examples probe"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "eslint": "^9.9.0",
+    "prettier": "^3.3.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0",
+    "typescript-eslint": "^8.0.0",
+    "vitest": "^2.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild",
+      "keytar",
+      "@vscode/vsce-sign"
+    ]
+  }
+}

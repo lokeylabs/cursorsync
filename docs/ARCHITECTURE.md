@@ -40,7 +40,7 @@ PowerSync syncs its own managed SQLite on each client; we bridge it to Cursor's 
 - **Primary key = the Cursor key** (`bubbleId:{composerId}:{messageId}`, `composerData:{composerId}`,
   `agentKv:blob:{sha256}`). Upsert by key.
 - Distinct keys never collide → union merge is conflict-free. The only true conflict is two
-  machines continuing the *same* conversation in the *same* second; worst case is a duplicated
+  machines continuing the _same_ conversation in the _same_ second; worst case is a duplicated
   message row, never a lost one. `updated_at` + `device_id` break ties for display ordering.
 - `agentKv` blobs are content-addressed (key = hash of value) → identical content dedupes for
   free and never needs conflict resolution.
