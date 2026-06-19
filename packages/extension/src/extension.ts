@@ -21,10 +21,10 @@ export function activate(ctx: vscode.ExtensionContext) {
   let status: PanelState["status"] = "idle";
   let statusText = "Ready";
 
-  // Output channel — visible via Output → "cursorsync" — for real diagnostics.
-  const out = vscode.window.createOutputChannel("cursorsync");
+  // LogOutputChannel — visible via Output → "cursorsync" AND persisted to disk for diagnostics.
+  const out = vscode.window.createOutputChannel("cursorsync", { log: true });
   ctx.subscriptions.push(out);
-  out.appendLine(`[${new Date().toISOString()}] cursorsync activated (device ${deviceId})`);
+  out.appendLine(`cursorsync activated (device ${deviceId})`);
 
   const currentRepo = (): string | null => {
     const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
