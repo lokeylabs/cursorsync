@@ -21,11 +21,17 @@ export function activate(ctx: vscode.ExtensionContext) {
   let status: PanelState["status"] = "idle";
   let statusText = "Ready";
 
+  // Output channel — visible via Output → "cursorsync" — for real diagnostics.
+  const out = vscode.window.createOutputChannel("cursorsync");
+  ctx.subscriptions.push(out);
+  out.appendLine(`[${new Date().toISOString()}] cursorsync activated (device ${deviceId})`);
+
   const currentRepo = (): string | null => {
     const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     return folder ? repoIdForPath(folder) : null;
   };
   const addLog = (m: string) => {
+    out.appendLine(`[${new Date().toISOString()}] ${m}`);
     log.unshift(`${new Date().toLocaleTimeString()}  ${m}`);
     if (log.length > 30) log.pop();
   };
@@ -68,17 +74,33 @@ export function activate(ctx: vscode.ExtensionContext) {
     try {
       setStatus("syncing", "Pushing chats…");
       const cfg = getConfig();
+      const repo = currentRepo();
+      out.appendLine(
+        `upSync start: scope=${cfg.syncScope} repo=${repo ?? "(none)"} bg=${!!opts?.background}`,
+      );
       const r = await bridge.upSync(
         user.id,
         cfg.syncScope,
-        currentRepo(),
+        repo,
         opts?.background ? BG_CAP : Infinity,
       );
       stats.pushed += r.pushed;
       stats.lastSync = new Date().toLocaleString();
+      out.appendLine(`upSync done: scanned=${r.scanned} pushed=${r.pushed}`);
       if (r.pushed > 0 || !opts?.background) addLog(`Pushed ${r.pushed} rows (${cfg.syncScope})`);
-      setStatus("idle", r.pushed ? `Pushed ${r.pushed}` : "Up to date");
+      if (cfg.syncScope === "repo" && r.pushed === 0 && !opts?.background) {
+        addLog(`No chats matched this repo (${repo ?? "no repo open"}). Try scope "All chats".`);
+      }
+      setStatus(
+        "idle",
+        r.pushed
+          ? `Pushed ${r.pushed}`
+          : cfg.syncScope === "repo"
+            ? "No chats for this repo"
+            : "Up to date",
+      );
     } catch (e) {
+      out.appendLine(`upSync ERROR: ${(e as Error).stack ?? (e as Error).message}`);
       addLog(`Push error: ${(e as Error).message}`);
       setStatus("error", "Push failed");
     }
